@@ -15,7 +15,30 @@ defmodule TokenManagerWeb.ErrorJSON do
   # By default, Phoenix returns the status message from
   # the template name. For example, "404.json" becomes
   # "Not Found".
+
+  def render("422.json", %{reason: reason}) do
+    %{errors: %{detail: reason}}
+  end
+
   def render(template, _assigns) do
     %{errors: %{detail: Phoenix.Controller.status_message_from_template(template)}}
+  end
+
+  def error(%{status: status, reason: reason}) do
+    %{
+      errors: %{
+        detail: reason,
+        status: status
+      }
+    }
+  end
+
+  def error(%{status: status}) do
+    %{
+      errors: %{
+        detail: Phoenix.Controller.status_message_from_template("#{status}"),
+        status: status
+      }
+    }
   end
 end

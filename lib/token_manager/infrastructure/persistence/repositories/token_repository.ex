@@ -79,6 +79,20 @@ defmodule TokenManager.Infrastructure.Repositories.TokenRepository do
     |> TokenSchema.to_domain()
   end
 
+  @spec get_token(binary()) :: {:ok, Token.t()} | {:error, atom()}
+  def get_token(id) do
+    TokenSchema
+    |> where([t], t.id == ^id)
+    |> Repo.one()
+    |> case do
+      nil ->
+        {:error, :token_not_found}
+
+      token ->
+        {:ok, token |> Repo.preload(:token_usages) |> TokenSchema.to_domain()}
+    end
+  end
+
   @doc """
   Retrieves an available token using SELECT FOR UPDATE SKIP LOCKED
   to handle concurrent access.
@@ -235,6 +249,33 @@ defmodule TokenManager.Infrastructure.Repositories.TokenRepository do
       |> Repo.update_all(set: [ended_at: now])
 
     {:ok, count}
+  end
+
+  @doc """
+  Lists all tokens in the system with their usage records.
+
+  Returns a list of domain Token entities.
+  """
+  @spec list_tokens() :: [Token.t()]
+  def list_tokens do
+    TokenSchema
+    |> order_by([t], desc: t.activated_at, desc: t.inserted_at)
+    |> Repo.all()
+    |> Enum.map(&TokenSchema.to_domain/1)
+  end
+
+  @doc """
+  Gets a user's active token, if any exists.
+
+  Returns nil if the user has no active token.
+  """
+  @spec get_user_active_token(binary()) :: Token.t() | nil
+  def get_user_active_token(user_id) do
+    TokenSchema
+    |> where([t], t.status == :active and t.current_user_id == ^user_id)
+    |> preload(:token_usages)
+    |> Repo.one()
+    |> maybe_to_domain()
   end
 
   @doc """

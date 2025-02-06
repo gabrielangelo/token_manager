@@ -31,6 +31,9 @@ defmodule TokenManager.Domain.Token.TokenService do
   @spec get_token!(binary()) :: Token.t() | no_return()
   def get_token!(token_id), do: TokenRepository.get_token!(token_id)
 
+  @spec get_token(binary()) :: {:ok, Token.t()} | {:error, atom()}
+  def get_token(token_id), do: TokenRepository.get_token(token_id)
+
   @doc """
   Activates a token for a user.
 
@@ -42,24 +45,36 @@ defmodule TokenManager.Domain.Token.TokenService do
   @spec activate_token(binary()) :: activation_result()
   def activate_token(user_id) do
     TokenRepository.transaction(fn ->
-      case TokenRepository.get_available_token() do
+      case TokenRepository.get_user_active_token(user_id) do
         nil ->
-          handle_no_available_tokens(user_id)
+          case TokenRepository.get_available_token() do
+            nil ->
+              handle_no_available_tokens(user_id)
 
-        token ->
-          activate_available_token(token, user_id)
+            token ->
+              activate_available_token(token, user_id)
+          end
+
+        _token ->
+          {:error, :already_has_active_token}
       end
     end)
     |> unwrap_transaction_result()
   end
 
   defp handle_no_available_tokens(user_id) do
-    case TokenRepository.get_oldest_active_token() do
-      nil ->
-        {:error, :no_tokens_available}
+    with active_count <- TokenRepository.count_active_tokens(),
+         true <- active_count >= 100 do
+      {:error, :no_tokens_available}
+    else
+      false ->
+        case TokenRepository.get_oldest_active_token() do
+          nil ->
+            {:error, :no_tokens_available}
 
-      token ->
-        release_and_activate_token(token, user_id)
+          token ->
+            release_and_activate_token(token, user_id)
+        end
     end
   end
 
@@ -150,7 +165,12 @@ defmodule TokenManager.Domain.Token.TokenService do
     |> unwrap_transaction_result()
   end
 
+  @spec list_tokens() :: [Token.t()]
+  def list_tokens do
+    TokenRepository.list_tokens()
+  end
+
   defp unwrap_transaction_result({:ok, {:ok, result}}), do: {:ok, result}
+  defp unwrap_transaction_result({:ok, {:error, error}}), do: {:error, error}
   defp unwrap_transaction_result({:ok, result}), do: {:ok, result}
-  defp unwrap_transaction_result({:error, error}), do: {:error, error}
 end

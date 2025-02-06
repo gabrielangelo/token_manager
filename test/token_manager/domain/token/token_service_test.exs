@@ -73,11 +73,7 @@ defmodule TokenManager.Domain.Token.TokenServiceTest do
         })
       end)
 
-      {:ok, %{token: token}} = TokenService.activate_token(user_id)
-
-      active_count = TokenRepository.count_active_tokens()
-      assert active_count == 100
-      assert token.status == :active
+      assert {:error, :no_tokens_available} == TokenService.activate_token(user_id)
     end
   end
 
