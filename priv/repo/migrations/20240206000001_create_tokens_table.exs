@@ -8,7 +8,7 @@ defmodule TokenManager.Repo.Migrations.CreateTokensTable do
       add :current_user_id, :binary_id
       add :activated_at, :utc_datetime
 
-      timestamps()
+      timestamps(type: :utc_datetime)
     end
 
     create index(:tokens, [:status])

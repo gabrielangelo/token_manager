@@ -9,7 +9,7 @@ defmodule TokenManager.Repo.Migrations.CreateTokenUsagesTable do
       add :started_at, :utc_datetime, null: false
       add :ended_at, :utc_datetime
 
-      timestamps()
+      timestamps(type: :utc_datetime)
     end
 
     create index(:token_usages, [:token_id])

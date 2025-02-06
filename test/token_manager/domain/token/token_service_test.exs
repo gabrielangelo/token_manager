@@ -2,9 +2,9 @@ defmodule TokenManager.Domain.Token.TokenServiceTest do
   use TokenManager.DataCase
   use Oban.Testing, repo: TokenManager.Repo
 
-  import TokenManager.Factory
   alias TokenManager.Domain.Token.TokenService
   alias TokenManager.Infrastructure.Repositories.TokenRepository
+  import TokenManager.Factory
 
   describe "token activation" do
     test "successfully activates an available token" do

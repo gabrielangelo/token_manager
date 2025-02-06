@@ -1,14 +1,36 @@
 defmodule TokenManager.Domain.Token.TokenService do
+  @moduledoc """
+  Provides token lifecycle management functionality for a token-based access control system.
+  The service maintains token state transitions, enforces access rules, and handles concurrent
+  access through database transactions. It ensures that users can only hold one active token
+  at a time and implements automatic token cleanup after periods of inactivity. The service
+  maintains a comprehensive usage history, tracking when tokens are activated and released,
+  while protecting against race conditions through transactional operations.
+  """
+
   alias TokenManager.Domain.Token
   alias TokenManager.Domain.Token.TokenUsage
   alias TokenManager.Infrastructure.Repositories.TokenRepository
   alias TokenManager.Infrastructure.Workers.TokenCleanupWorker
 
+  @doc """
+  Retrieves a token by its ID.
+
+  Raises if token is not found.
+  """
   def get_token!(token_id), do: TokenRepository.get_token!(token_id)
 
+  @doc """
+  Activates a token for a user.
+
+  If no tokens are available, releases and reactivates the oldest active token.
+
+  Returns `{:ok, %{token: token, token_usage: usage}}` on success,
+  or `{:error, reason}` on failure.
+  """
   def activate_token(user_id) do
     TokenRepository.transaction(fn ->
-      case TokenRepository.get_available_token()  do
+      case TokenRepository.get_available_token() do
         nil ->
           handle_no_available_tokens(user_id)
 
@@ -48,6 +70,13 @@ defmodule TokenManager.Domain.Token.TokenService do
     end
   end
 
+  @doc """
+  Releases a token, making it available for other users.
+
+  Closes the active usage record and schedules cleanup.
+
+  Returns `{:ok, token}` on success, or `{:error, reason}` on failure.
+  """
   def release_token(token) do
     TokenRepository.transaction(fn ->
       with {:ok, _} <- close_token_usage(token),
@@ -94,6 +123,12 @@ defmodule TokenManager.Domain.Token.TokenService do
     TokenCleanupWorker.schedule_cleanup(token_id)
   end
 
+  @doc """
+  Releases all active tokens and closes their usage records.
+
+  Returns `{:ok, count}` where count is the number of tokens released,
+  or `{:error, reason}` on failure.
+  """
   def clear_active_tokens do
     TokenRepository.transaction(fn ->
       with {:ok, count} <- TokenRepository.clear_active_tokens(),

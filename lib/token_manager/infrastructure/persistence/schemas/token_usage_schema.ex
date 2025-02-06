@@ -1,25 +1,54 @@
 defmodule TokenManager.Infrastructure.Persistence.Schemas.TokenUsageSchema do
   @moduledoc """
-  Schema for token_usages table
+  Defines the database schema for token usage tracking, managing temporal aspects of token
+  assignments including activation and release times. This schema maintains the relationship
+  between tokens and users while preserving the complete history of token utilization patterns
+  and ownership transitions.
   """
 
   use Ecto.Schema
   import Ecto.Changeset
   alias TokenManager.Domain.Token.TokenUsage
+  alias TokenManager.Infrastructure.Persistence.Schemas.TokenSchema
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
+
+  @type t :: %__MODULE__{
+    id: binary(),
+    user_id: binary(),
+    token_id: binary(),
+    started_at: DateTime.t(),
+    ended_at: DateTime.t() | nil,
+    inserted_at: DateTime.t(),
+    updated_at: DateTime.t()
+  }
 
   schema "token_usages" do
     field :user_id, :binary_id
     field :started_at, :utc_datetime
     field :ended_at, :utc_datetime
 
-    belongs_to :token, TokenManager.Infrastructure.Persistence.Schemas.TokenSchema, type: :binary_id
+    belongs_to :token, TokenSchema,
+      type: :binary_id
 
-    timestamps()
+    timestamps(type: :utc_datetime)
   end
 
+  @doc """
+  Creates a changeset for token usage records with validation rules.
+
+  Requires:
+  - user_id: identifies the token user
+  - token_id: reference to the associated token
+  - started_at: timestamp when usage began
+
+  Optional:
+  - ended_at: timestamp when usage ended
+
+  Returns `%Ecto.Changeset{}`.
+  """
+  @spec changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def changeset(token_usage, attrs) do
     token_usage
     |> cast(attrs, [:user_id, :token_id, :started_at, :ended_at])
@@ -27,7 +56,12 @@ defmodule TokenManager.Infrastructure.Persistence.Schemas.TokenUsageSchema do
     |> foreign_key_constraint(:token_id)
   end
 
+  @doc """
+  Converts a schema struct to domain entity.
 
+  All fields are mapped directly with no transformations.
+  """
+  @spec to_domain(%__MODULE__{}) :: TokenUsage.t()
   def to_domain(%__MODULE__{} = schema) do
     %TokenUsage{
       id: schema.id,
@@ -38,6 +72,12 @@ defmodule TokenManager.Infrastructure.Persistence.Schemas.TokenUsageSchema do
     }
   end
 
+  @doc """
+  Converts a domain entity to schema struct.
+
+  All fields are mapped directly with no transformations.
+  """
+  @spec from_domain(TokenUsage.t()) :: t()
   def from_domain(%TokenUsage{} = usage) do
     %__MODULE__{
       id: usage.id,

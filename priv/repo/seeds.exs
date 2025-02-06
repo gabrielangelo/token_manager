@@ -12,9 +12,9 @@ defmodule TokenManager.Seeds do
         Enum.map(1..(100 - token_count), fn _ ->
           %{
             id: Ecto.UUID.generate(),
-            status: "available",
-            inserted_at: DateTime.utc_now(),
-            updated_at: DateTime.utc_now()
+            status: :available,
+            inserted_at: DateTime.utc_now() |> DateTime.truncate(:second),
+            updated_at: DateTime.utc_now() |> DateTime.truncate(:second)
           }
         end)
 
@@ -23,4 +23,4 @@ defmodule TokenManager.Seeds do
   end
 end
 
-TokenManager.Seeds.run()
+# TokenManager.Seeds.run()
