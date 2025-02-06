@@ -8,7 +8,6 @@ defmodule TokenManager.Domain.Token.TokenUsage do
   defstruct [:id, :token_id, :user_id, :started_at, :ended_at]
 
   @type t :: %__MODULE__{
-          id: binary(),
           token_id: binary(),
           user_id: binary(),
           started_at: DateTime.t(),

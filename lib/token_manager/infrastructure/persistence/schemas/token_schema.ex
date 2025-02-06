@@ -14,14 +14,11 @@ defmodule TokenManager.Infrastructure.Persistence.Schemas.TokenSchema do
   @foreign_key_type :binary_id
 
   @type t :: %__MODULE__{
-    id: binary(),
-    status: :available | :active,
-    current_user_id: binary() | nil,
-    activated_at: DateTime.t() | nil,
-    token_usages: [TokenUsageSchema.t()] | Ecto.Association.NotLoaded.t(),
-    inserted_at: DateTime.t(),
-    updated_at: DateTime.t()
-  }
+          id: binary(),
+          status: :available | :active,
+          current_user_id: binary() | nil,
+          activated_at: DateTime.t() | nil
+        }
 
   schema "tokens" do
     field :status, Ecto.Enum, values: [:available, :active], default: :available
@@ -80,6 +77,7 @@ defmodule TokenManager.Infrastructure.Persistence.Schemas.TokenSchema do
   end
 
   defp load_token_usages(%Ecto.Association.NotLoaded{}), do: []
+
   defp load_token_usages(token_usages) when is_list(token_usages) do
     Enum.map(token_usages, &TokenUsageSchema.to_domain/1)
   end

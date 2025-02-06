@@ -13,11 +13,22 @@ defmodule TokenManager.Domain.Token.TokenService do
   alias TokenManager.Infrastructure.Repositories.TokenRepository
   alias TokenManager.Infrastructure.Workers.TokenCleanupWorker
 
+  @type error_reason ::
+          :token_not_found
+          | :invalid_token_state
+          | :already_has_active_token
+          | :database_error
+
+  @type activation_result ::
+          {:ok, %{token: Token.t(), token_usage: TokenUsage.t()}}
+          | {:error, error_reason()}
+
   @doc """
   Retrieves a token by its ID.
 
   Raises if token is not found.
   """
+  @spec get_token!(binary()) :: Token.t() | no_return()
   def get_token!(token_id), do: TokenRepository.get_token!(token_id)
 
   @doc """
@@ -28,6 +39,7 @@ defmodule TokenManager.Domain.Token.TokenService do
   Returns `{:ok, %{token: token, token_usage: usage}}` on success,
   or `{:error, reason}` on failure.
   """
+  @spec activate_token(binary()) :: activation_result()
   def activate_token(user_id) do
     TokenRepository.transaction(fn ->
       case TokenRepository.get_available_token() do
@@ -52,11 +64,9 @@ defmodule TokenManager.Domain.Token.TokenService do
   end
 
   defp release_and_activate_token(token, user_id) do
-    with {:ok, _} <- release_token(token),
-         {:ok, result} <- activate_available_token(token, user_id) do
-      {:ok, result}
-    else
-      error -> error
+    case release_token(token) do
+      {:ok, _} -> activate_available_token(token, user_id)
+      {:error, _reason} = error -> error
     end
   end
 
@@ -66,7 +76,7 @@ defmodule TokenManager.Domain.Token.TokenService do
          {:ok, _job} <- schedule_cleanup(activated_token.id) do
       {:ok, %{token: activated_token, token_usage: token_usage}}
     else
-      error -> error
+      {:error, _error} = error -> error
     end
   end
 
@@ -129,6 +139,7 @@ defmodule TokenManager.Domain.Token.TokenService do
   Returns `{:ok, count}` where count is the number of tokens released,
   or `{:error, reason}` on failure.
   """
+  @spec clear_active_tokens() :: {:ok, non_neg_integer()} | {:error, error_reason()}
   def clear_active_tokens do
     TokenRepository.transaction(fn ->
       with {:ok, count} <- TokenRepository.clear_active_tokens(),
@@ -139,7 +150,6 @@ defmodule TokenManager.Domain.Token.TokenService do
     |> unwrap_transaction_result()
   end
 
-  # Helper to unwrap transaction results
   defp unwrap_transaction_result({:ok, {:ok, result}}), do: {:ok, result}
   defp unwrap_transaction_result({:ok, result}), do: {:ok, result}
   defp unwrap_transaction_result({:error, error}), do: {:error, error}

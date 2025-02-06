@@ -7,14 +7,14 @@ defmodule TokenManager.Domain.Token do
 
   defstruct [:id, :status, :current_user_id, :activated_at, :token_usages]
 
+  @type status :: :available | :active
   @type t :: %__MODULE__{
-          id: binary(),
-          status: :available | :active,
+          id: binary() | nil,
+          status: status(),
           current_user_id: binary() | nil,
           activated_at: DateTime.t() | nil,
-          token_usages: list()
+          token_usages: list(TokenManager.Domain.Token.TokenUsage.t())
         }
-
   @doc """
   Creates a new token with initial available state.
   """

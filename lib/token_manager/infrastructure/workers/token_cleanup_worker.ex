@@ -18,7 +18,7 @@ defmodule TokenManager.Infrastructure.Workers.TokenCleanupWorker do
 
   def schedule_cleanup(token_id) do
     %{token_id: token_id}
-    |> new(schedule_in: 120)
+    |> new(schedule_in: _seconds = 120)
     |> Oban.insert()
   end
 end
