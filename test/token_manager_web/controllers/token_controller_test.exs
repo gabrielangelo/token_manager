@@ -121,15 +121,17 @@ defmodule TokenManagerWeb.TokenControllerTest do
       insert(:token_usage_schema, token_id: token.id, user_id: user_id)
 
       conn = get(conn, ~p"/api/tokens/#{token.id}")
+      token_id = token.id
 
       assert %{
                "data" => %{
-                 "id" => _id,
+                 "id" => ^token_id,
                  "status" => "active",
                  "current_user_id" => ^user_id,
                  "active_usage" => %{
-                   "user_id" => ^user_id,
-                   "started_at" => _started_at
+                   "ended_at" => nil,
+                   "started_at" => _,
+                   "user_id" => ^user_id
                  }
                }
              } = json_response(conn, 200)
@@ -152,11 +154,7 @@ defmodule TokenManagerWeb.TokenControllerTest do
                "data" => %{
                  "id" => _id,
                  "status" => "active",
-                 "current_user_id" => ^user_id,
-                 "active_usage" => %{
-                   "user_id" => ^user_id,
-                   "started_at" => _started_at
-                 }
+                 "current_user_id" => ^user_id
                }
              } = json_response(conn, 200)
     end
