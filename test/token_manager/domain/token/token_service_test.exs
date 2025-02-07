@@ -111,7 +111,7 @@ defmodule TokenManager.Domain.Token.TokenServiceTest do
 
       activated_token = %{
         activated_token
-        | activated_at: DateTime.add(DateTime.utc_now(), -121, :second)
+        | activated_at: DateTime.add(DateTime.utc_now(), -150, :second)
       }
 
       {:ok, expired_token} =

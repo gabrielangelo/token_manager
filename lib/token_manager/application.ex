@@ -18,7 +18,8 @@ defmodule TokenManager.Application do
       # Start a worker by calling: TokenManager.Worker.start_link(arg)
       # {TokenManager.Worker, arg},
       # Start to serve requests, typically the last entry
-      TokenManagerWeb.Endpoint
+      TokenManagerWeb.Endpoint,
+      TokenManager.Infrastructure.StateManager.TokenStateManager
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

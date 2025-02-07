@@ -11,7 +11,10 @@ defmodule TokenManager.Domain.Token.TokenService do
   alias TokenManager.Domain.Token
   alias TokenManager.Domain.Token.TokenUsage
   alias TokenManager.Infrastructure.Repositories.TokenRepository
+  alias TokenManager.Infrastructure.StateManager.TokenStateManager
   alias TokenManager.Infrastructure.Workers.TokenCleanupWorker
+
+  @two_minutes 120
 
   @type error_reason ::
           :token_not_found
@@ -22,6 +25,42 @@ defmodule TokenManager.Domain.Token.TokenService do
   @type activation_result ::
           {:ok, %{token: Token.t(), token_usage: TokenUsage.t()}}
           | {:error, error_reason()}
+
+  @doc """
+  Checks if a token has expired and releases it if necessary.
+  Returns:
+  - {:ok, token} if released successfully
+  - {:error, :token_not_found} if token doesn't exist
+  - {:error, :token_not_expired} if token is still valid
+  - {:error, reason} for other errors
+  """
+  @spec release_token_if_expired(binary()) ::
+          {:ok, Token.t()} | {:error, :token_not_found | :token_not_expired | atom()}
+  def release_token_if_expired(token_id) do
+    TokenRepository.transaction(fn ->
+      with {:ok, token} <- TokenRepository.get_token(token_id),
+           usage when not is_nil(usage) <- TokenRepository.get_active_usage(token.id),
+           true <- token_expired?(token),
+           {:ok, _usage} <- close_token_usage(token),
+           {:ok, released_token} <- release_token(token) do
+        TokenStateManager.mark_token_available(token_id)
+        {:ok, released_token}
+      else
+        nil -> {:error, :token_not_found}
+        false -> {:error, :token_not_expired}
+      end
+    end)
+  end
+
+  defp token_expired?(token) do
+    case DateTime.compare(
+           DateTime.add(token.activated_at, @two_minutes),
+           DateTime.utc_now()
+         ) do
+      :lt -> true
+      _ -> false
+    end
+  end
 
   @doc """
   Retrieves a token by its ID.
@@ -89,6 +128,7 @@ defmodule TokenManager.Domain.Token.TokenService do
     with {:ok, activated_token} <- do_activate_token(token, user_id),
          {:ok, token_usage} <- create_token_usage(activated_token, user_id),
          {:ok, _job} <- schedule_cleanup(activated_token.id) do
+      TokenStateManager.mark_token_active(token.id, user_id)
       {:ok, %{token: activated_token, token_usage: token_usage}}
     else
       {:error, _error} = error -> error

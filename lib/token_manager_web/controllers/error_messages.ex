@@ -1,4 +1,6 @@
 defmodule TokenManagerWeb.ErrorMessages do
+  @moduledoc false
+
   @spec error_message(atom()) :: String.t()
   def error_message(:no_tokens_available), do: "No tokens available"
   def error_message(:already_has_active_token), do: "User already has an active token"

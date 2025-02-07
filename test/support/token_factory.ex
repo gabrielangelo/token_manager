@@ -1,4 +1,6 @@
 defmodule TokenManager.TokenFactory do
+  @moduledoc false
+
   alias TokenManager.Infrastructure.Persistence.Schemas.TokenSchema
   alias TokenManager.Infrastructure.Persistence.Schemas.TokenUsageSchema
 
