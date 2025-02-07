@@ -9,7 +9,17 @@ defmodule TokenManager.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.cobertura": :test
+      ],
+      preferred_cli_env: [
+        "test.watch": :test
+      ],
     ]
   end
 
@@ -47,7 +57,9 @@ defmodule TokenManager.MixProject do
       {:oban, "~> 2.19"},
       {:ex_machina, "~> 2.8.0", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.3", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.3", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: :test},
+      {:mix_test_watch, "~> 1.1", only: [:dev, :test], runtime: false}
     ]
   end
 

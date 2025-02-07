@@ -1,12 +1,17 @@
 import Config
 
-# Configure your database
+# Determine if we're running in Docker
+docker_env = System.get_env("IN_DOCKER") == "true"
+
+database_host = if docker_env, do: "db", else: "localhost"
+database_port = if docker_env, do: "5432", else: "5432"
+
+database_url =
+  System.get_env("DATABASE_URL") ||
+    "ecto://postgres:postgres@#{database_host}:#{database_port}/token_manager_dev"
+
 config :token_manager, TokenManager.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  database: "token_manager_dev",
-  stacktrace: true,
+  url: database_url,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
 
@@ -16,15 +21,25 @@ config :token_manager, TokenManager.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
+# Configure the endpoint
 config :token_manager, TokenManagerWeb.Endpoint,
-  # Binding to loopback ipv4 address prevents access from other machines.
-  # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}, port: 4000],
+  # Binding to all IPv4 interfaces
+  http: [
+    ip: {0, 0, 0, 0},
+    port: String.to_integer(System.get_env("PORT") || "4000")
+  ],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "VXUVUK29yhtr+WD2tmPlKwaVHqNGPEXE3dzjJ08nOtiAwUS40OshtoL85bLDim78",
+  secret_key_base: "dev_secret",
   watchers: []
+
+# Configure Oban
+config :token_manager, Oban,
+  repo: TokenManager.Repo,
+  plugins: [Oban.Plugins.Pruner],
+  queues: [tokens: 10],
+  peer: if(docker_env, do: :node_name_prefix, else: false)
 
 # ## SSL Support
 #
