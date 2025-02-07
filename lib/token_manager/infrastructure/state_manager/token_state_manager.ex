@@ -20,8 +20,19 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   @table :token_states
   @refresh_interval :timer.minutes(5)
 
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, nil, name: __MODULE__)
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      restart: :permanent,
+      shutdown: 5000,
+      type: :worker
+    }
+  end
+
+  def start_link(opts) do
+    name = Keyword.get(opts, :name, __MODULE__)
+    GenServer.start_link(__MODULE__, opts, name: name)
   end
 
   @spec add_tokens([TokenSchema.t()]) :: :ok
@@ -40,13 +51,17 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   @spec get_available_tokens() :: [Token.t()]
   def get_available_tokens do
     match_spec = [{{:"$1", :"$2"}, [{:==, {:map_get, :status, :"$2"}, :available}], [:"$2"]}]
+
     :ets.select(@table, match_spec)
+    |> Enum.sort_by(&(&1.activated_at || DateTime.from_unix!(0)), {:desc, DateTime})
   end
 
   @spec get_active_tokens() :: [Token.t()]
   def get_active_tokens do
     match_spec = [{{:"$1", :"$2"}, [{:==, {:map_get, :status, :"$2"}, :active}], [:"$2"]}]
+
     :ets.select(@table, match_spec)
+    |> Enum.sort_by(&(&1.activated_at || DateTime.from_unix!(0)), {:desc, DateTime})
   end
 
   @spec mark_token_active(binary(), binary()) :: update_result()
@@ -85,19 +100,24 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
     PubSub.subscribe(@pubsub, @topic)
   end
 
-  # Server Callbacks
-
   @impl true
   def init(_) do
     table =
-      :ets.new(@table, [
-        :set,
-        :named_table,
-        :public,
-        :protected,
-        read_concurrency: true,
-        write_concurrency: true
-      ])
+      case :ets.info(@table) do
+        :undefined ->
+          :ets.new(@table, [
+            :set,
+            :named_table,
+            :public,
+            :protected,
+            read_concurrency: true,
+            write_concurrency: true
+          ])
+
+        _ ->
+          :ets.delete_all_objects(@table)
+          @table
+      end
 
     :ok = PubSub.subscribe(@pubsub, @topic)
     load_initial_state(table)

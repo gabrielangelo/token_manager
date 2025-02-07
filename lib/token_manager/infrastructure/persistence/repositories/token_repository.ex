@@ -11,6 +11,8 @@ defmodule TokenManager.Infrastructure.Repositories.TokenRepository do
 
   alias TokenManager.Infrastructure.Persistence.Schemas.TokenSchema
   alias TokenManager.Infrastructure.Persistence.Schemas.TokenUsageSchema
+  alias TokenManager.Infrastructure.StateManager.TokenStateManager
+
   alias TokenManager.Repo
 
   import Ecto.Query
@@ -81,16 +83,24 @@ defmodule TokenManager.Infrastructure.Repositories.TokenRepository do
 
   @spec get_token(binary()) :: {:ok, Token.t()} | {:error, atom()}
   def get_token(id) do
+    with {:error, :not_found} <- TokenStateManager.get_token_state(id),
+         nil <- fetch_token_from_db(id) do
+      {:error, :token_not_found}
+    else
+      {:ok, token} ->
+        {:ok, token}
+
+      %TokenSchema{} = token ->
+        TokenStateManager.add_tokens([token])
+        {:ok, TokenSchema.to_domain(token)}
+    end
+  end
+
+  defp fetch_token_from_db(id) do
     TokenSchema
     |> where([t], t.id == ^id)
+    |> preload(:token_usages)
     |> Repo.one()
-    |> case do
-      nil ->
-        {:error, :token_not_found}
-
-      token ->
-        {:ok, token |> Repo.preload(:token_usages) |> TokenSchema.to_domain()}
-    end
   end
 
   @doc """
@@ -258,10 +268,20 @@ defmodule TokenManager.Infrastructure.Repositories.TokenRepository do
   """
   @spec list_tokens() :: [Token.t()]
   def list_tokens do
+    with [] <- TokenStateManager.get_available_tokens(),
+         [] <- TokenStateManager.get_active_tokens() do
+      tokens = load_all_tokens_from_db()
+      Enum.map(tokens, &TokenSchema.to_domain/1)
+    else
+      cached_tokens when is_list(cached_tokens) ->
+        TokenStateManager.get_available_tokens() ++ TokenStateManager.get_active_tokens()
+    end
+  end
+
+  defp load_all_tokens_from_db do
     TokenSchema
-    |> order_by([t], desc: t.activated_at, desc: t.inserted_at)
+    |> preload(:token_usages)
     |> Repo.all()
-    |> Enum.map(&TokenSchema.to_domain/1)
   end
 
   @doc """

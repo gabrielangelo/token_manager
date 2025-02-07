@@ -1,9 +1,20 @@
 defmodule TokenManagerWeb.TokenControllerTest do
-  use TokenManagerWeb.ConnCase
+  use TokenManagerWeb.ConnCase, async: false
 
   import TokenManager.Factory
 
+  alias TokenManager.Infrastructure.StateManager.TokenStateManager
   alias TokenManager.Infrastructure.Repositories.TokenRepository
+
+  setup do
+    {:ok, _token_manager} =
+      start_supervised({
+        TokenManager.Infrastructure.StateManager.TokenStateManager,
+        name: :"TokenStateManager_#{:rand.uniform(100_000)}"
+      })
+
+    :ok
+  end
 
   describe "POST /api/tokens/activate" do
     test "successfully activates an available token", %{conn: conn} do
@@ -48,32 +59,92 @@ defmodule TokenManagerWeb.TokenControllerTest do
   end
 
   describe "GET /api/tokens" do
-    test "lists all tokens", %{conn: conn} do
-      insert(:token_schema, status: :available)
-      token2 = insert(:active_token_schema)
-      insert(:token_usage_schema, token_id: token2.id)
+    test "lists all tokens from db", %{conn: conn} do
+      token1 = insert(:token_schema, status: :available)
+      user_id = Ecto.UUID.generate()
+
+      token2 = insert(:token_schema, status: :active, current_user_id: user_id)
+      token3 = insert(:token_schema, status: :available)
+
+      insert(:token_usage_schema, %{
+        token_id: token2.id,
+        user_id: user_id,
+        started_at: DateTime.utc_now()
+      })
 
       conn = get(conn, ~p"/api/tokens")
 
+      token1_id = token1.id
+      token2_id = token2.id
+      token3_id = token3.id
+
       assert %{
                "data" => [
-                 %{"id" => _id2, "status" => "available"},
-                 %{"id" => _id1, "status" => "active"}
+                 %{"id" => ^token1_id, "status" => "available"},
+                 %{"id" => ^token2_id, "status" => "active"},
+                 %{"id" => ^token3_id, "status" => "available"}
                ]
              } = json_response(conn, 200)
     end
 
-    test "returns empty list when no tokens exist", %{conn: conn} do
+    test "lists all tokens from cache", %{conn: conn} do
+      token1 = insert(:token_schema, status: :available)
+      user_id = Ecto.UUID.generate()
+
+      token2 = insert(:token_schema, status: :active, current_user_id: user_id)
+      token3 = insert(:token_schema, status: :available)
+
+      insert(:token_usage_schema, %{
+        token_id: token2.id,
+        user_id: user_id,
+        started_at: DateTime.utc_now()
+      })
+
+      TokenStateManager.add_tokens([token1, token2, token3])
       conn = get(conn, ~p"/api/tokens")
-      assert %{"data" => []} = json_response(conn, 200)
+
+      response = json_response(conn, 200)["data"]
+
+      assert length(response) == 3
+
+      assert Enum.all?(response, fn token ->
+               token["id"] in [token1.id, token2.id, token3.id] &&
+                 token["status"] in ["available", "active"]
+             end)
     end
   end
 
   describe "GET /api/tokens/:id" do
-    test "shows token with active usage", %{conn: conn} do
+    test "shows token with active usage from db", %{conn: conn} do
       user_id = Ecto.UUID.generate()
       token = insert(:token_schema, status: :active, current_user_id: user_id)
       insert(:token_usage_schema, token_id: token.id, user_id: user_id)
+
+      conn = get(conn, ~p"/api/tokens/#{token.id}")
+
+      assert %{
+               "data" => %{
+                 "id" => _id,
+                 "status" => "active",
+                 "current_user_id" => ^user_id,
+                 "active_usage" => %{
+                   "user_id" => ^user_id,
+                   "started_at" => _started_at
+                 }
+               }
+             } = json_response(conn, 200)
+    end
+
+    test "shows token with active usage from cache", %{conn: conn} do
+      user_id = Ecto.UUID.generate()
+
+      token =
+        build(:token_schema, id: Ecto.UUID.generate(), status: :active, current_user_id: user_id)
+
+      usage = build(:token_usage_schema, token_id: token.id, user_id: user_id)
+
+      token = Map.put(token, :token_usages, [usage])
+      TokenStateManager.add_tokens([token])
 
       conn = get(conn, ~p"/api/tokens/#{token.id}")
 

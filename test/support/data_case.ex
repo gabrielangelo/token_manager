@@ -30,6 +30,7 @@ defmodule TokenManager.DataCase do
 
   setup tags do
     TokenManager.DataCase.setup_sandbox(tags)
+
     :ok
   end
 
@@ -38,6 +39,7 @@ defmodule TokenManager.DataCase do
   """
   def setup_sandbox(tags) do
     pid = Sandbox.start_owner!(TokenManager.Repo, shared: not tags[:async])
+
     on_exit(fn -> Sandbox.stop_owner(pid) end)
   end
 
