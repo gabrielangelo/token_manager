@@ -113,7 +113,7 @@ mix phx.server
 
 ### Docker-based Development
 
-We provide a comprehensive Docker-based development environment that closely mirrors production:
+We provide a Docker-based development environment that closely mirrors production:
 
 ```bash
 # Start development environment
