@@ -10,7 +10,7 @@ defmodule TokenManager.Infrastructure.Workers.TokenCleanupWorker do
   and integrates with the token store and PubSub systems.
   """
   use Oban.Worker,
-    queue: :tokens,
+    queue: :token_cleanup_queue,
     unique: [
       fields: [:args, :worker],
       keys: [:token_id]
@@ -19,10 +19,15 @@ defmodule TokenManager.Infrastructure.Workers.TokenCleanupWorker do
 
   alias TokenManager.Domain.Token.TokenService
 
+  require Logger
+
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"token_id" => token_id}}) do
+    Logger.info("cleaning token #{token_id}")
+
     case TokenService.release_token_if_expired(token_id) do
       {:ok, _token} ->
+        Logger.info("token #{token_id} succesfully released!")
         :ok
 
       {:error, :token_not_found} ->

@@ -1,11 +1,23 @@
 defmodule TokenManager.Domain.Token.TokenServiceTest do
-  use TokenManager.DataCase
+  use TokenManager.DataCase, async: false
+
+  alias TokenManager.Infrastructure.StateManager.TokenStateManager
   use Oban.Testing, repo: TokenManager.Repo
 
   alias TokenManager.Domain.Token.TokenService
   alias TokenManager.Infrastructure.Repositories.TokenRepository
   alias TokenManager.Infrastructure.Workers.TokenCleanupWorker
   import TokenManager.Factory
+
+  setup do
+    {:ok, _token_manager} =
+      start_supervised({
+        TokenManager.Infrastructure.StateManager.TokenStateManager,
+        name: :"TokenStateManager_#{:rand.uniform(100_000)}"
+      })
+
+    :ok
+  end
 
   describe "token activation" do
     test "successfully activates an available token" do
@@ -163,17 +175,25 @@ defmodule TokenManager.Domain.Token.TokenServiceTest do
 
   describe "token operations" do
     test "clearing active tokens" do
-      insert_list(5, :token_schema)
+      tokens = insert_list(5, :token_schema)
+      TokenStateManager.add_tokens(tokens)
 
       Enum.each(1..5, fn _ ->
         user_id = Ecto.UUID.generate()
         {:ok, _} = TokenService.activate_token(user_id)
       end)
 
+      assert length(TokenStateManager.get_available_tokens()) == 0
+
       {:ok, cleared_count} = TokenService.clear_active_tokens()
 
       assert cleared_count == 5
       assert TokenRepository.count_active_tokens() == 0
+      assert length(TokenStateManager.get_available_tokens()) == 5
+
+      # checks if cache was updated
+      assert length(TokenStateManager.get_available_tokens()) == cleared_count
+      assert length(TokenStateManager.get_active_tokens()) == 0
 
       active_usages = TokenRepository.count_active_usages()
       assert active_usages == 0

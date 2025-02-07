@@ -40,21 +40,23 @@ defmodule TokenManagerWeb.TokenJSON do
     %{
       id: token.id,
       status: token.status,
-      current_user_id: token.current_user_id,
+      current_user_id: Map.get(token, :current_user_id),
       activated_at: token.activated_at
     }
   end
 
+  defp usage_data(nil), do: %{}
+
   defp usage_data(usage) do
     %{
-      user_id: usage.user_id,
+      user_id: Map.get(usage, :user_id),
       started_at: usage.started_at,
       ended_at: usage.ended_at
     }
   end
 
   defp data_with_active_usage(token) do
-    active_usage = Enum.find(token.token_usages, &is_nil(&1.ended_at))
+    active_usage = Enum.find(token.token_usages, &usage_data/1)
 
     token
     |> data()

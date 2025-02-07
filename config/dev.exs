@@ -38,8 +38,9 @@ config :token_manager, TokenManagerWeb.Endpoint,
 config :token_manager, Oban,
   repo: TokenManager.Repo,
   plugins: [Oban.Plugins.Pruner],
-  queues: [tokens: 10]
-  # peer: if(docker_env, do: :node_name_prefix, else: false)
+  queues: [token_cleanup_queue: 10]
+
+# peer: if(docker_env, do: :node_name_prefix, else: false)
 
 # ## SSL Support
 #

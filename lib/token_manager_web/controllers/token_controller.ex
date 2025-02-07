@@ -83,7 +83,6 @@ defmodule TokenManagerWeb.TokenController do
     with {:ok, count} <- TokenService.clear_active_tokens() do
       conn
       |> put_status(:ok)
-      # Changed from "cleared.json"
       |> render(:cleared, count: count)
     end
   end

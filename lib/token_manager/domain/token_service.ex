@@ -188,6 +188,7 @@ defmodule TokenManager.Domain.Token.TokenService do
     TokenRepository.transaction(fn ->
       with {:ok, count} <- TokenRepository.clear_active_tokens(),
            {:ok, _} <- TokenRepository.close_all_active_usages() do
+        TokenStateManager.clear_active_tokens()
         {:ok, count}
       end
     end)
