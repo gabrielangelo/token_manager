@@ -12,7 +12,7 @@ Token Manager uses a dual approach to state management by combining ETS (Erlang 
 
 The system adopts this dual-layer approach based on practical needs. ETS delivers fast read performance and handles multiple users accessing tokens at once, meeting the demands of high-traffic periods. While ETS keeps data in memory and operates on single nodes, PostgreSQL provides permanent storage and supports complex transactions. Together, they create a balanced solution: ETS handles rapid token status checks while PostgreSQL maintains reliable records for auditing and recovery.
 
-A TokenStateManager keeps ETS and the database synchronized. The system uses Phoenix PubSub for communication between different parts, allowing for future expansion while maintaining accurate token tracking.
+A TokenStateManager keeps ETS and the database synchronized. The system uses Phoenix PubSub for communication between different parts, allowing for future expansion while maintaining token tracking.
 
 ### Token Lifecycle Management
 
@@ -22,7 +22,7 @@ Oban handles background tasks because it:
 - Prevents duplicate cleanup attempts
 - Maintains scheduled tasks even through system restarts
 - Continues trying if initial attempts fail
-- Handles the two-minute timing requirements effectively
+- Handles the two-minute timing requirements
 
 To keep tokens moving smoothly, the system employs two cleanup methods: individual scheduled releases and regular checks for any overlooked tokens.
 
@@ -195,4 +195,4 @@ Planned improvements include:
 
 ## Conclusion
 
-Token Manager demonstrates effective resource management in distributed systems. Its design balances quick response times with reliable operation, creating a maintainable and testable solution for token handling.
+Token Manager demonstrates acceptable resource management in distributed systems. Its design balances quick response times with reliable operation, creating a maintainable and testable solution for token handling.
