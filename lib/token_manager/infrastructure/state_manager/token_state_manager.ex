@@ -12,10 +12,7 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   alias TokenManager.Infrastructure.Persistence.Schemas.TokenSchema
   alias TokenManager.Infrastructure.Repositories.TokenRepository
 
-  @typedoc "Token lookup result"
   @type lookup_result :: {:ok, Token.t()} | {:error, :not_found | :invalid_state}
-
-  @typedoc "Token update result"
   @type update_result :: {:ok, Token.t()} | {:error, :not_found | :update_failed}
 
   @pubsub TokenManager.PubSub
@@ -27,19 +24,11 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
   end
 
-  @doc """
-  Adds new tokens to the ETS table.
-  Called when seeding new tokens.
-  """
   @spec add_tokens([TokenSchema.t()]) :: :ok
   def add_tokens(tokens) when is_list(tokens) do
     GenServer.call(__MODULE__, {:add_tokens, tokens})
   end
 
-  @doc """
-  Retrieves a token's current state from ETS.
-  Provides direct concurrent access without going through GenServer.
-  """
   @spec get_token_state(binary()) :: lookup_result()
   def get_token_state(token_id) when is_binary(token_id) do
     case :ets.lookup(@table, token_id) do
@@ -48,60 +37,33 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
     end
   end
 
-  @doc """
-  Returns all tokens currently in available state.
-  """
   @spec get_available_tokens() :: [Token.t()]
   def get_available_tokens do
-    match_spec = [
-      {{:"$1", :"$2"}, [{:==, {:map_get, :status, :"$2"}, :available}], [:"$2"]}
-    ]
-
+    match_spec = [{{:"$1", :"$2"}, [{:==, {:map_get, :status, :"$2"}, :available}], [:"$2"]}]
     :ets.select(@table, match_spec)
   end
 
-  @doc """
-  Returns all tokens currently in active state.
-  """
   @spec get_active_tokens() :: [Token.t()]
   def get_active_tokens do
-    match_spec = [
-      {{:"$1", :"$2"}, [{:==, {:map_get, :status, :"$2"}, :active}], [:"$2"]}
-    ]
-
+    match_spec = [{{:"$1", :"$2"}, [{:==, {:map_get, :status, :"$2"}, :active}], [:"$2"]}]
     :ets.select(@table, match_spec)
   end
 
-  @doc """
-  Updates a token's state to active and assigns it to a user.
-  Broadcasts the change to all nodes.
-  """
   @spec mark_token_active(binary(), binary()) :: update_result()
   def mark_token_active(token_id, user_id) when is_binary(token_id) and is_binary(user_id) do
     GenServer.call(__MODULE__, {:mark_active, token_id, user_id})
   end
 
-  @doc """
-  Updates a token's state to available and removes user assignment.
-  Broadcasts the change to all nodes.
-  """
   @spec mark_token_available(binary()) :: update_result()
   def mark_token_available(token_id) when is_binary(token_id) do
     GenServer.call(__MODULE__, {:mark_available, token_id})
   end
 
-  @doc """
-  Forces a reload of the state from the database.
-  Useful for manual synchronization if needed.
-  """
   @spec reload_state() :: {:ok, non_neg_integer()}
   def reload_state do
     GenServer.call(__MODULE__, :reload_state)
   end
 
-  @doc """
-  Returns debug information about the current state of the ETS table.
-  """
   @spec debug_table_state() :: map()
   def debug_table_state do
     all_tokens = :ets.tab2list(@table)
@@ -111,6 +73,16 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
       active_count: Enum.count(all_tokens, fn {_, token} -> token.status == :active end),
       available_count: Enum.count(all_tokens, fn {_, token} -> token.status == :available end)
     }
+  end
+
+  @spec subscribe_to_token(binary()) :: :ok | {:error, term()}
+  def subscribe_to_token(token_id) when is_binary(token_id) do
+    PubSub.subscribe(@pubsub, "token:#{token_id}")
+  end
+
+  @spec subscribe_to_all_tokens() :: :ok | {:error, term()}
+  def subscribe_to_all_tokens do
+    PubSub.subscribe(@pubsub, @topic)
   end
 
   # Server Callbacks
@@ -128,9 +100,7 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
       ])
 
     :ok = PubSub.subscribe(@pubsub, @topic)
-
     load_initial_state(table)
-
     {:ok, %{table: table}, {:continue, :schedule_refresh}}
   end
 
@@ -143,12 +113,11 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   @impl true
   def handle_call({:add_tokens, tokens}, _from, state) do
     Enum.each(tokens, fn token ->
-      domain_token = TokenManager.Infrastructure.Persistence.Schemas.TokenSchema.to_domain(token)
+      domain_token = TokenSchema.to_domain(token)
       :ets.insert(@table, {token.id, domain_token})
     end)
 
     Logger.info("Added #{length(tokens)} new tokens to state manager")
-
     {:reply, :ok, state}
   end
 
@@ -162,7 +131,7 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   @impl true
   def handle_call({:mark_available, token_id}, _from, state) do
     result = update_token_state(token_id, :available, nil)
-    if match?({:ok, _}, result), do: broadcast_state_change({:token_released, token_id})
+    if match?({:ok, _}, result), do: broadcast_state_change({:token_released, token_id, nil})
     {:reply, result, state}
   end
 
@@ -185,36 +154,42 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
     {:noreply, state}
   end
 
-  defp broadcast_state_change(change) do
-    PubSub.broadcast(@pubsub, @topic, {:token_state_change, change})
+  defp broadcast_state_change({event, token_id, user_id}) do
+    status = status_from_event(event)
+    PubSub.broadcast(@pubsub, @topic, {:token_state_change, {event, token_id, user_id}})
+
+    PubSub.broadcast(
+      @pubsub,
+      "token:#{token_id}",
+      {:token_state_changed, token_id, status, user_id}
+    )
   end
+
+  defp status_from_event(:token_activated), do: :active
+  defp status_from_event(:token_released), do: :available
 
   defp handle_state_change({:token_activated, token_id, user_id}) do
     update_token_state(token_id, :active, user_id)
   end
 
-  defp handle_state_change({:token_released, token_id}) do
+  defp handle_state_change({:token_released, token_id, _user_id}) do
     update_token_state(token_id, :available, nil)
   end
 
   defp update_token_state(token_id, status, user_id) do
-    try do
-      case :ets.lookup(@table, token_id) do
-        [{^token_id, token}] ->
-          updated_token = %{
-            token
-            | status: status,
-              current_user_id: user_id,
-              activated_at: if(status == :active, do: DateTime.utc_now(), else: nil)
-          }
+    with [{^token_id, token}] <- :ets.lookup(@table, token_id),
+         updated_token = %{
+           token
+           | status: status,
+             current_user_id: user_id,
+             activated_at: if(status == :active, do: DateTime.utc_now(), else: nil)
+         },
+         true <- :ets.insert(@table, {token_id, updated_token}) do
+      {:ok, updated_token}
+    else
+      [] ->
+        {:error, :not_found}
 
-          true = :ets.insert(@table, {token_id, updated_token})
-          {:ok, updated_token}
-
-        [] ->
-          {:error, :not_found}
-      end
-    catch
       error ->
         Logger.error("Failed to update token state: #{inspect(error)}")
         {:error, :update_failed}
@@ -223,11 +198,9 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
 
   defp load_initial_state(table) do
     tokens = TokenRepository.list_tokens()
-
     :ets.delete_all_objects(table)
 
-    tokens
-    |> Enum.each(fn token ->
+    Enum.each(tokens, fn token ->
       :ets.insert(table, {token.id, token})
     end)
 

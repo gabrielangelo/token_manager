@@ -193,7 +193,7 @@ defmodule TokenManager.Infrastructure.Repositories.TokenRepository do
     |> Repo.update()
     |> case do
       {:ok, schema} -> {:ok, TokenUsageSchema.to_domain(schema)}
-      error -> error
+      {:error, _} = error -> error
     end
   end
 

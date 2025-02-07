@@ -4,6 +4,7 @@ defmodule TokenManager.Domain.Token.TokenServiceTest do
 
   alias TokenManager.Domain.Token.TokenService
   alias TokenManager.Infrastructure.Repositories.TokenRepository
+  alias TokenManager.Infrastructure.Workers.TokenCleanupWorker
   import TokenManager.Factory
 
   describe "token activation" do
@@ -120,13 +121,13 @@ defmodule TokenManager.Domain.Token.TokenServiceTest do
       args = %{token_id: expired_token.id}
 
       assert_enqueued(
-        worker: TokenManager.Infrastructure.Workers.TokenCleanupWorker,
+        worker: TokenCleanupWorker,
         args: args
       )
 
       [job] = TokenManager.Repo.all(Oban.Job)
 
-      TokenManager.Infrastructure.Workers.TokenCleanupWorker.perform(job)
+      TokenCleanupWorker.perform(job)
       released_token = TokenRepository.get_token!(token.id)
       assert released_token.status == :available
       assert is_nil(released_token.current_user_id)
@@ -148,12 +149,12 @@ defmodule TokenManager.Domain.Token.TokenServiceTest do
       args = %{token_id: expired_token.id}
 
       assert_enqueued(
-        worker: TokenManager.Infrastructure.Workers.TokenCleanupWorker,
+        worker: TokenCleanupWorker,
         args: args
       )
 
       [job] = TokenManager.Repo.all(Oban.Job)
-      TokenManager.Infrastructure.Workers.TokenCleanupWorker.perform(job)
+      TokenCleanupWorker.perform(job)
 
       [usage] = TokenRepository.get_token_history(token.id)
       assert not is_nil(usage.ended_at)

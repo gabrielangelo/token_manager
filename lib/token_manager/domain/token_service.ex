@@ -28,11 +28,6 @@ defmodule TokenManager.Domain.Token.TokenService do
 
   @doc """
   Checks if a token has expired and releases it if necessary.
-  Returns:
-  - {:ok, token} if released successfully
-  - {:error, :token_not_found} if token doesn't exist
-  - {:error, :token_not_expired} if token is still valid
-  - {:error, reason} for other errors
   """
   @spec release_token_if_expired(binary()) ::
           {:ok, Token.t()} | {:error, :token_not_found | :token_not_expired | atom()}
@@ -46,6 +41,7 @@ defmodule TokenManager.Domain.Token.TokenService do
         TokenStateManager.mark_token_available(token_id)
         {:ok, released_token}
       else
+        {:error, _} = error -> error
         nil -> {:error, :token_not_found}
         false -> {:error, :token_not_expired}
       end
@@ -81,21 +77,14 @@ defmodule TokenManager.Domain.Token.TokenService do
   Returns `{:ok, %{token: token, token_usage: usage}}` on success,
   or `{:error, reason}` on failure.
   """
-  @spec activate_token(binary()) :: activation_result()
   def activate_token(user_id) do
     TokenRepository.transaction(fn ->
-      case TokenRepository.get_user_active_token(user_id) do
-        nil ->
-          case TokenRepository.get_available_token() do
-            nil ->
-              handle_no_available_tokens(user_id)
-
-            token ->
-              activate_available_token(token, user_id)
-          end
-
-        _token ->
-          {:error, :already_has_active_token}
+      with nil <- TokenRepository.get_user_active_token(user_id),
+           token when not is_nil(token) <- TokenRepository.get_available_token() do
+        activate_available_token(token, user_id)
+      else
+        _active_token = %Token{} -> {:error, :already_has_active_token}
+        nil -> handle_no_available_tokens(user_id)
       end
     end)
     |> unwrap_transaction_result()
@@ -211,6 +200,11 @@ defmodule TokenManager.Domain.Token.TokenService do
   end
 
   defp unwrap_transaction_result({:ok, {:ok, result}}), do: {:ok, result}
-  defp unwrap_transaction_result({:ok, {:error, error}}), do: {:error, error}
+
+  defp unwrap_transaction_result({:ok, {:error, %Ecto.Changeset{} = _changeset}}),
+    do: {:error, :database_error}
+
+  defp unwrap_transaction_result({:ok, {:error, _} = error}), do: error
+
   defp unwrap_transaction_result({:ok, result}), do: {:ok, result}
 end

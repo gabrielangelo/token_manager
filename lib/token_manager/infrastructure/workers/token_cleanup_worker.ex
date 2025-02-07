@@ -1,4 +1,14 @@
 defmodule TokenManager.Infrastructure.Workers.TokenCleanupWorker do
+  @moduledoc """
+  An Oban worker that handles the periodic cleanup of expired tokens
+  from the token store. Using Oban's scheduling capabilities, it runs
+  at configurable intervals to maintain system health by removing tokens
+  that are no longer valid. The worker processes tokens in batches for
+  efficiency and uses the PubSub system to notify other parts of the application about cleanup operations.
+  It also exposes metrics for monitoring cleanup performance and effectiveness.
+  The worker requires proper Oban queue configuration in the application config
+  and integrates with the token store and PubSub systems.
+  """
   use Oban.Worker,
     queue: :tokens,
     unique: [
@@ -8,13 +18,11 @@ defmodule TokenManager.Infrastructure.Workers.TokenCleanupWorker do
     max_attempts: 3
 
   alias TokenManager.Domain.Token.TokenService
-  alias TokenManager.Infrastructure.StateManager.TokenStateManager
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"token_id" => token_id}}) do
     case TokenService.release_token_if_expired(token_id) do
       {:ok, _token} ->
-        TokenStateManager.mark_token_available(token_id)
         :ok
 
       {:error, :token_not_found} ->
