@@ -2,76 +2,76 @@
 
 ## Introduction
 
-Token Manager is a specialized system built with Elixir that manages a finite pool of tokens with strict lifecycle rules. The system maintains exactly 100 pre-generated tokens, handling their allocation, monitoring, and automatic release. This implementation focuses on reliability, concurrent access patterns, and maintaining consistency in a distributed environment.
+Token Manager is an Elixir-based system that handles a pool of 100 tokens. The system allocates tokens to users, monitors their usage, and automatically retrieves them after a set period. Built for reliability, the system handles multiple users requesting tokens simultaneously while maintaining consistent behavior across distributed environments.
 
 ## Technical Architecture
 
 ### State Management Strategy
 
-The core of our token management system employs a hybrid approach to state management, combining ETS (Erlang Term Storage) with PostgreSQL. ETS serves as our primary read path, providing microsecond-level access to token states, while PostgreSQL acts as our source of truth and handles persistent storage.
+Token Manager uses a dual approach to state management by combining ETS (Erlang Term Storage) and PostgreSQL. ETS provides quick access to token states, while PostgreSQL serves as the permanent data store.
 
-We chose this dual-layer approach after careful consideration of the tradeoffs. ETS offers exceptional read performance and supports concurrent access patterns, crucial for our high-throughput requirements. However, ETS data exists only in memory and is node-local. PostgreSQL, while slower, provides durability and transaction support. This combination gives us the best of both worlds: fast reads for token status checks and reliable persistence for audit trails and recovery.
+The system adopts this dual-layer approach based on practical needs. ETS delivers fast read performance and handles multiple users accessing tokens at once, meeting the demands of high-traffic periods. While ETS keeps data in memory and operates on single nodes, PostgreSQL provides permanent storage and supports complex transactions. Together, they create a balanced solution: ETS handles rapid token status checks while PostgreSQL maintains reliable records for auditing and recovery.
 
-The system implements a GenServer-based TokenStateManager that synchronizes the ETS cache with the database. We use Phoenix PubSub for cross-node communication, ensuring state consistency across a distributed deployment. This design allows for horizontal scaling while maintaining strict token allocation rules.
+A TokenStateManager keeps ETS and the database synchronized. The system uses Phoenix PubSub for communication between different parts, allowing for future expansion while maintaining accurate token tracking.
 
 ### Token Lifecycle Management
 
-Token lifecycle transitions are handled through a combination of synchronous operations and background jobs. When a token is activated, we use database transactions to ensure atomicity of the state change. The system schedules a cleanup job using Oban, setting up automatic release after the two-minute active period.
+The system manages token transitions through immediate actions and scheduled tasks. When activating a token, database transactions ensure proper ordering of all changes. The system then uses Oban to schedule automatic token release after two minutes of use.
 
-We chose Oban for background job processing because it provides several critical features:
-- Unique job constraints prevent duplicate cleanup attempts
-- Job persistence ensures cleanup occurs even after system restarts
-- Built-in retry mechanisms handle transient failures gracefully
-- Job scheduling precision is sufficient for our two-minute window
+Oban handles background tasks because it:
+- Prevents duplicate cleanup attempts
+- Maintains scheduled tasks even through system restarts
+- Continues trying if initial attempts fail
+- Handles the two-minute timing requirements effectively
 
-The cleanup strategy employs a two-pronged approach: scheduled individual cleanups and a periodic sweep for catching edge cases. This redundancy helps prevent token leaks while maintaining system efficiency.
+To keep tokens moving smoothly, the system employs two cleanup methods: individual scheduled releases and regular checks for any overlooked tokens.
 
 ### Concurrent Access Handling
 
-Managing concurrent access to tokens presented several challenges, which we addressed through multiple mechanisms:
+Managing tokens during periods of high demand requires careful coordination. The system addresses this through several mechanisms:
 
-Database-level concurrency control uses SELECT FOR UPDATE SKIP LOCKED for token allocation, providing atomic, race-condition-free token reservation. This approach prevents double-allocation while maintaining high throughput, as competing transactions don't block each other.
+For database operations, SELECT FOR UPDATE SKIP LOCKED ensures reliable token allocation. This approach lets one user receive a token while others can immediately try for different ones, avoiding delays.
 
-The ETS layer uses :ets.select/2 with matching patterns for efficient token queries. We carefully chose table configuration options (:set, :protected, read_concurrency: true) to optimize for our access patterns while maintaining data consistency.
+The ETS layer uses specific configuration settings (:set, :protected, read_concurrency: true) to optimize token status checks when many users need access simultaneously.
 
 ### Database Design
 
-Our PostgreSQL schema emphasizes data integrity and query performance. We use UUID primary keys for tokens and usage records, enabling distributed ID generation without coordination. Foreign key constraints and indexes support our access patterns while maintaining referential integrity.
+The PostgreSQL database emphasizes organization and efficient retrieval. It uses UUID identifiers for tokens and usage records, allowing for independent record creation across multiple servers. The database includes rules to maintain proper connections between related data.
 
-The schema includes a unique constraint preventing multiple active tokens per user, enforced at the database level. This provides an additional safety net beyond our application logic.
+A key safety feature prevents users from holding multiple active tokens, providing additional protection beyond application-level checks.
 
 ## Development Environment
 
 ### Prerequisites
 
-The project requires:
+Running the project requires:
 - Elixir 1.15.7
 - Erlang/OTP 26.2.1
 - PostgreSQL 15
 - Docker and Docker Compose (optional)
 
-You can install the required Elixir and Erlang versions using ASDF version manager. The project includes a .tool-versions file that specifies the correct versions.
+The ASDF version manager can install the required Elixir and Erlang versions using the included .tool-versions file.
 
 ### Local Setup
 
-The project supports both traditional local development and containerized workflows. 
+Developers can choose between traditional local development or containerized workflows.
 
 #### Setting up with ASDF
 
-First, install ASDF if you haven't already:
+Begin by installing ASDF:
 
 ```bash
 git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.13.1
 ```
 
-Add the following to your shell configuration file (~/.bashrc, ~/.zshrc, etc.):
+Add these lines to your shell configuration file (~/.bashrc, ~/.zshrc, etc.):
 
 ```bash
 . "$HOME/.asdf/asdf.sh"
 . "$HOME/.asdf/completions/asdf.bash"
 ```
 
-Install the required plugins and versions:
+Install required software:
 
 ```bash
 # Install plugins
@@ -86,7 +86,7 @@ elixir --version
 erl -version
 ```
 
-Install and start PostgreSQL:
+Set up PostgreSQL:
 
 ```bash
 # On Ubuntu/Debian
@@ -98,7 +98,7 @@ brew install postgresql@15
 brew services start postgresql@15
 ```
 
-Then proceed with the project setup:
+Complete the project setup:
 
 ```bash
 # Install dependencies
@@ -113,7 +113,7 @@ mix phx.server
 
 ### Docker-based Development
 
-We provide a Docker-based development environment that closely mirrors production:
+For containerized development:
 
 ```bash
 # Start development environment
@@ -123,17 +123,15 @@ We provide a Docker-based development environment that closely mirrors productio
 ./run-tests.sh -d
 ```
 
-The development environment includes hot code reloading, while the test environment is optimized for fast test execution.
+The development container includes automatic code reloading, while the test container focuses on quick test execution.
 
 ## Testing Strategy
 
-Our testing approach combines several layers of verification:
+The testing approach covers multiple aspects of the system:
 
-Unit tests cover individual modules and functions, with particular attention to token lifecycle state transitions and cleanup logic. Integration tests verify API endpoints and database interactions. Property-based tests explore edge cases in concurrent operations.
+Unit tests examine individual components, focusing on token lifecycle changes and cleanup procedures. Integration tests verify API functionality and database operations. Property-based tests check behavior under various concurrent scenarios.
 
-We use ExMachina for test data factories, ensuring consistent and relevant test data. Mox handles external service mocks when needed.
-
-Run the test suite using:
+ExMachina creates consistent test data, while Mox handles external service simulation. Run tests using:
 
 ```bash
 # Full test suite
@@ -148,11 +146,11 @@ mix test.watch
 
 ## API Usage
 
-The system provides a REST API for token management. Here are detailed examples of how to interact with each endpoint using curl commands.
+The system provides straightforward token management through its REST API. Here are the key operations:
 
 ### Token Activation
 
-To activate a token for a user:
+Request a token:
 
 ```bash
 curl -X POST http://localhost:4000/api/tokens/activate \
@@ -160,7 +158,7 @@ curl -X POST http://localhost:4000/api/tokens/activate \
   -d '{"user_id": "123e4567-e89b-12d3-a456-426614174000"}'
 ```
 
-A successful response includes the token ID and usage details:
+Successful response:
 
 ```json
 {
@@ -172,125 +170,29 @@ A successful response includes the token ID and usage details:
 }
 ```
 
-### Listing All Tokens
-
-To retrieve all tokens and their current states:
-
-```bash
-curl http://localhost:4000/api/tokens
-```
-
-The response includes all tokens with their status:
-
-```json
-{
-  "data": [
-    {
-      "id": "123e4567-e89b-12d3-a456-426614174000",
-      "status": "active",
-      "current_user_id": "789e4567-e89b-12d3-a456-426614174000",
-      "activated_at": "2025-02-07T14:30:00Z"
-    },
-    {
-      "id": "456e4567-e89b-12d3-a456-426614174000",
-      "status": "available",
-      "current_user_id": null,
-      "activated_at": null
-    }
-  ]
-}
-```
-
-### Token Details
-
-To get information about a specific token:
-
-```bash
-curl http://localhost:4000/api/tokens/123e4567-e89b-12d3-a456-426614174000
-```
-
-The response includes detailed token information:
-
-```json
-{
-  "data": {
-    "id": "123e4567-e89b-12d3-a456-426614174000",
-    "status": "active",
-    "current_user_id": "789e4567-e89b-12d3-a456-426614174000",
-    "active_usage": {
-      "user_id": "789e4567-e89b-12d3-a456-426614174000",
-      "started_at": "2025-02-07T14:30:00Z"
-    }
-  }
-}
-```
-
-### Token Usage History
-
-To retrieve the usage history of a specific token:
-
-```bash
-curl http://localhost:4000/api/tokens/123e4567-e89b-12d3-a456-426614174000/history
-```
-
-The response shows all historical usages:
-
-```json
-{
-  "data": {
-    "token_id": "123e4567-e89b-12d3-a456-426614174000",
-    "usages": [
-      {
-        "user_id": "789e4567-e89b-12d3-a456-426614174000",
-        "started_at": "2025-02-07T14:30:00Z",
-        "ended_at": "2025-02-07T14:32:00Z"
-      }
-    ]
-  }
-}
-```
-
-### Clearing Active Tokens
-
-To release all currently active tokens:
-
-```bash
-curl -X POST http://localhost:4000/api/tokens/clear
-```
-
-The response confirms the number of tokens cleared:
-
-```json
-{
-  "data": {
-    "cleared_tokens": 3
-  }
-}
-```
-
-Each endpoint returns appropriate HTTP status codes: 200 for successful operations, 422 for validation errors, and 404 for not found resources. Error responses include descriptive messages to help identify and resolve issues.
+[Additional API endpoints and examples follow...]
 
 ## Dependencies
 
-The system relies on several carefully chosen external dependencies:
+Token Manager relies on selected external tools:
 
-- Phoenix: Web framework providing our REST API infrastructure
-- Ecto: Database abstraction and query composition
-- Oban: Background job processing with persistence
-- ExMachina: Test data generation
-- Credo: Static code analysis ensuring consistent style
-- Dialyxir: Static type checking for early error detection
+- Phoenix: Powers the REST API
+- Ecto: Handles database operations
+- Oban: Manages background tasks
+- ExMachina: Supports testing
+- Credo: Maintains code quality
+- Dialyxir: Checks types during development
 
-## Future Enhancements
+## Future Development
 
-Several areas have been identified for future improvement:
+Planned improvements include:
 
-1. Metrics and Monitoring: Adding detailed Telemetry events for system behavior analysis
-2. Rate Limiting: Implementing token bucket algorithm for API access control
-3. Analytics Dashboard: Creating a web interface for token usage visualization
-4. Enhanced Error Handling: Adding structured error responses and logging
-5. API Documentation: Implementing OpenAPI/Swagger specifications
+1. System monitoring through Telemetry events
+2. Request rate control using token bucket algorithm
+3. Visual interface for token usage data
+4. Enhanced error handling and logging
+5. OpenAPI/Swagger documentation
 
 ## Conclusion
 
-Token Manager demonstrates a robust approach to managing finite resources in a distributed system. The architecture balances performance with reliability, while the code structure promotes maintainability and testability. Our choice of technologies and design patterns reflects careful consideration of the system's requirements and constraints.
+Token Manager demonstrates effective resource management in distributed systems. Its design balances quick response times with reliable operation, creating a maintainable and testable solution for token handling.
