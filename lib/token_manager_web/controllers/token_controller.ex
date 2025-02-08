@@ -66,9 +66,9 @@ defmodule TokenManagerWeb.TokenController do
   """
   def history(conn, %{"id" => token_id}) do
     case TokenService.get_token(token_id) do
-      {:ok, _token} ->
+      {:ok, token} ->
         usages = TokenService.get_token_history(token_id)
-        render(conn, :history, usages: usages)
+        render(conn, :history, data: %{token | token_usages: usages})
 
       {:error, reason} ->
         conn

@@ -191,7 +191,7 @@ defmodule TokenManagerWeb.TokenControllerTest do
       conn = get(conn, ~p"/api/tokens/#{token.id}/history")
       response = json_response(conn, 200)
 
-      [last_token_usage, first_token_usage] = response["data"]
+      [last_token_usage, first_token_usage] = response["data"]["usages"]
 
       assert last_token_usage["user_id"] == user1_id
       assert not is_nil(last_token_usage["ended_at"])
@@ -205,7 +205,15 @@ defmodule TokenManagerWeb.TokenControllerTest do
 
       conn = get(conn, ~p"/api/tokens/#{token.id}/history")
 
-      assert %{"data" => []} = json_response(conn, 200)
+      token_id = token.id
+
+      assert %{
+               "data" => %{
+                 "meta" => %{"total_usages" => 0},
+                 "token_id" => ^token_id,
+                 "usages" => []
+               }
+             } = json_response(conn, 200)
     end
   end
 
