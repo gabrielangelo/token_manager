@@ -226,14 +226,25 @@ defmodule TokenManagerWeb.TokenControllerTest do
 
       conn = post(conn, ~p"/api/tokens/clear")
 
-      assert %{"data" => %{"cleared_tokens" => 3}} = json_response(conn, 200)
+      assert %{
+               "data" => %{
+                 "cleared_tokens" => 3,
+                 "message" => "Successfully cleared all active tokens"
+               }
+             } = json_response(conn, 200)
+
       assert TokenRepository.count_active_tokens() == 0
     end
 
     test "returns success when no active tokens exist", %{conn: conn} do
       conn = post(conn, ~p"/api/tokens/clear")
 
-      assert %{"data" => %{"cleared_tokens" => 0}} = json_response(conn, 200)
+      assert %{
+               "data" => %{
+                 "cleared_tokens" => 0,
+                 "message" => "No tokens currently require clearing"
+               }
+             } = json_response(conn, 200)
     end
   end
 end

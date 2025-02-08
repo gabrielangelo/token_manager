@@ -32,9 +32,17 @@ defmodule TokenManagerWeb.TokenJSON do
   end
 
   def cleared(%{count: count}) do
+    message =
+      if count == 0 do
+        "No tokens currently require clearing"
+      else
+        "Successfully cleared all active tokens"
+      end
+
     %{
       data: %{
-        cleared_tokens: count
+        cleared_tokens: count,
+        message: message
       }
     }
   end
