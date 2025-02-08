@@ -53,17 +53,23 @@ defmodule TokenManager.Infrastructure.Repositories.TokenRepository do
   end
 
   @doc """
-  Retrieves token usage history ordered by most recent first.
-
-  Returns a list of domain TokenUsage entities.
+  Retrieves the token usage history for a specific token.
+  First attempts to get the history from cache, falls back to database if not found.
+  Returns a list of TokenUsage domain objects sorted by timestamp.
   """
   @spec get_token_history(binary()) :: [TokenUsage.t()]
-  def get_token_history(token_id) do
-    TokenUsageSchema
-    |> where([tu], tu.token_id == ^token_id)
-    |> order_by([tu], desc: tu.inserted_at)
-    |> Repo.all()
-    |> Enum.map(&TokenUsageSchema.to_domain/1)
+  def get_token_history(token_id) when is_binary(token_id) do
+    case TokenStateManager.get_token_state(token_id) do
+      {:ok, token} when not is_nil(token.token_usages) and token.token_usages != [] ->
+        token.token_usages
+
+      _ ->
+        TokenUsageSchema
+        |> where([tu], tu.token_id == ^token_id)
+        |> order_by([tu], desc: tu.inserted_at)
+        |> Repo.all()
+        |> Enum.map(&TokenUsageSchema.to_domain/1)
+    end
   end
 
   @doc """

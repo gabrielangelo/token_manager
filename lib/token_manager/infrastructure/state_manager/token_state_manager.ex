@@ -110,6 +110,24 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   end
 
   @doc """
+  Retrieves the token usage history for a specific token.
+  Returns a list of token usage entries sorted by timestamp in descending order.
+  """
+  @spec get_token_history(binary()) :: {:ok, [Token.t()]} | {:error, :not_found}
+  def get_token_history(token_id) when is_binary(token_id) do
+    case get_token_state(token_id) do
+      {:ok, token} ->
+        history =
+          Enum.sort_by(token.token_usages, & &1.started_at, {:desc, DateTime})
+
+        {:ok, history}
+
+      {:error, :not_found} = error ->
+        error
+    end
+  end
+
+  @doc """
   Returns a sorted list of all available tokens.
   Tokens are sorted by activation time in descending order.
   """
@@ -356,12 +374,34 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
     end
   end
 
-  defp create_updated_token(token, status, user_id) do
+  defp create_updated_token(%{token_usages: nil} = token, status, user_id) do
+    %{token | status: status, current_user_id: user_id, activated_at: nil}
+  end
+
+  defp create_updated_token(%{token_usages: []} = token, status, user_id) do
+    %{token | status: status, current_user_id: user_id, activated_at: nil}
+  end
+
+  defp create_updated_token(%{token_usages: usages} = token, status, user_id) do
+    sorted_usages =
+      usages
+      |> Enum.sort_by(&(&1.started_at || DateTime.from_unix!(0)), {:desc, DateTime})
+
+    updated_usages =
+      case sorted_usages do
+        [last_usage | tail] ->
+          [%{last_usage | ended_at: DateTime.utc_now()} | tail]
+
+        [] ->
+          []
+      end
+
     %{
       token
       | status: status,
         current_user_id: user_id,
-        activated_at: nil
+        activated_at: nil,
+        token_usages: updated_usages
     }
   end
 
