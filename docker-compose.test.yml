@@ -27,6 +27,11 @@ services:
           sleep 1
         done
         echo "Database is ready!"
+        
+        mix local.hex --force &&
+        mix local.rebar --force &&
+        mix deps.get &&
+        mix deps.compile &&
         mix do ecto.create, ecto.migrate, test
       '
 
