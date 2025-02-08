@@ -10,6 +10,7 @@ defmodule TokenManager.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
+      test_coverage: [tool: ExCoveralls, summary: [threshold: 75]],
       preferred_cli_env: [
         coveralls: :test,
         "coveralls.detail": :test,
