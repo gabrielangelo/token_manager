@@ -35,8 +35,8 @@ For database operations, SELECT FOR UPDATE SKIP LOCKED ensures reliable token al
 The ETS layer uses specific configuration settings (:set, :protected, read_concurrency: true) to optimize token status checks when many users need access simultaneously.
 
 ### Database Design
-
-The PostgreSQL database emphasizes organization and efficient retrieval. It uses UUID identifiers for tokens and usage records, allowing for independent record creation across multiple servers. The database includes rules to maintain proper connections between related data.
+It uses UUID identifiers for tokens and usage records, allowing for independent record creation across multiple servers. The database includes rules to maintain proper connections between related data like token and token_usage. These 
+tables is the base for the token manager data.
 
 The system deliberately omits a dedicated user management system to maintain focus on the token state machine implementation. Instead, it uses UUID strings to simulate user identifiers, which adequately serves the core token management functionality without introducing the complexity of user authentication and management.
 
