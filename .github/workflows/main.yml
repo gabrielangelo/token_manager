@@ -1,0 +1,142 @@
+name: Elixir CI
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  dialyzer:
+    name: Run Dialyzer
+    runs-on: ubuntu-latest
+    
+    env:
+      MIX_ENV: dev
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.16.0'
+          otp-version: '26.2.1'
+          
+      - name: Cache PLTs
+        uses: actions/cache@v3
+        with:
+          path: |
+            priv/plts/*.plt
+            priv/plts/*.plt.hash
+          key: plt-cache-${{ runner.os }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            plt-cache-${{ runner.os }}-
+            
+      - name: Cache deps
+        uses: actions/cache@v3
+        id: deps-cache
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+            
+      - name: Cache _build
+        uses: actions/cache@v3
+        id: build-cache
+        with:
+          path: _build
+          key: ${{ runner.os }}-build-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+            
+      - name: Install dependencies
+        run: |
+          mix local.rebar --force
+          mix local.hex --force
+          mix deps.get
+          
+      - name: Create PLTs directory
+        run: mkdir -p priv/plts
+        
+      - name: Run dialyzer
+        run: mix dialyzer
+
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    
+    env:
+      MIX_ENV: dev
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.16.0'
+          otp-version: '26.2.1'
+          
+      - name: Cache deps
+        uses: actions/cache@v3
+        id: deps-cache
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+            
+      - name: Cache _build
+        uses: actions/cache@v3
+        id: build-cache
+        with:
+          path: _build
+          key: ${{ runner.os }}-build-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+            
+      - name: Install dependencies
+        run: |
+          mix local.rebar --force
+          mix local.hex --force
+          mix deps.get
+          
+      - name: Run Credo
+        run: mix credo --strict
+        
+      - name: Check formatting
+        run: mix format --check-formatted
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    env:
+      MIX_ENV: test
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Docker Compose
+        uses: ndeloof/install-compose-action@v0.0.1
+        
+      - name: Build test image
+        run: docker compose -f docker-compose.test.yml build
+        
+      - name: Run tests
+        run: docker compose -f docker-compose.test.yml run --rm test
+        
+      - name: Run tests with coverage
+        run: docker compose -f docker-compose.test.yml run --rm test mix test --cover
+        
+      - name: Clean up
+        run: docker compose -f docker-compose.test.yml down -v
+        if: always()
+        
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: cover/
