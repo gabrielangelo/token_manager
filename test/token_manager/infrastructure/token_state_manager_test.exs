@@ -23,7 +23,7 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManagerTest do
       PubSub.subscribe(@pubsub, "token:#{token.id}")
       TokenStateManager.mark_token_active(token, user_id)
       token_id = token.id
-      assert_receive {:token_state_changed, ^token_id, :active, ^user_id}
+      assert_receive {:token_state_changed, ^token_id, :active, nil, ^user_id}
     end
   end
 
@@ -50,7 +50,7 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManagerTest do
       TokenStateManager.mark_token_active(token, user_id)
       token_id = token.id
 
-      assert_receive {:token_state_changed, ^token_id, :active, ^user_id}
+      assert_receive {:token_state_changed, ^token_id, :active, nil, ^user_id}
     end
 
     test "doesn't receive events for other tokens" do
@@ -82,7 +82,7 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManagerTest do
 
       TokenManager.Domain.Token.TokenService.activate_token(user_id)
       token_id = token.id
-      assert_receive {:token_state_change, {:token_activated, ^token_id, ^user_id}}
+      assert_receive {:token_state_change, {:token_activated, ^token_id, _, ^user_id}}
     end
   end
 end

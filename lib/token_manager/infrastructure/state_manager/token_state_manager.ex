@@ -213,9 +213,12 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   end
 
   @impl true
-  def handle_call({:mark_active, token, user_id}, _from, state) do
-    result = update_token_state_with_usage(token, user_id)
-    if match?({:ok, _}, result), do: broadcast_state_change({:token_activated, token.id, user_id})
+  def handle_call({:mark_active, token, token_usage}, _from, state) do
+    result = update_token_state_with_usage(token, token_usage)
+
+    if match?({:ok, _}, result),
+      do: broadcast_state_change({:token_activated, token, token_usage})
+
     {:reply, result, state}
   end
 
@@ -362,8 +365,8 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
     }
   end
 
-  defp broadcast_state_change({event, token_id, user_id}) do
-    status = if event == :token_activated, do: :active, else: :available
+  defp broadcast_state_change({event, token_id, user_id}) when event in [:token_released] do
+    status = :available
 
     PubSub.broadcast(@pubsub, @topic, {:token_state_change, {event, token_id, user_id}})
 
@@ -374,8 +377,27 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
     )
   end
 
-  defp handle_state_change({:token_activated, token_id, user_id}) do
-    update_token_state(token_id, :active, user_id)
+  defp broadcast_state_change({:token_activated, token, token_usage}) do
+    status = :active
+
+    PubSub.broadcast(
+      @pubsub,
+      @topic,
+      {:token_state_change, {:token_activated, token.id, token.current_user_id, token_usage}}
+    )
+
+    PubSub.broadcast(
+      @pubsub,
+      "token:#{token.id}",
+      {:token_state_changed, token.id, status, token.current_user_id, token_usage}
+    )
+  end
+
+  defp handle_state_change({:token_activated, token_id, user_id, token_usage})
+       when is_binary(token_id) do
+    with {:ok, token} <- get_token_state(token_id) do
+      update_token_state_with_usage(%{token | current_user_id: user_id}, token_usage)
+    end
   end
 
   defp handle_state_change({:token_released, token_id, _user_id}) do
