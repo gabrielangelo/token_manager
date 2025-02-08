@@ -318,7 +318,7 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
 
   defp update_token_state(token_id, status, user_id) do
     with [{^token_id, token}] <- :ets.lookup(@table, token_id),
-         updated_token = create_updated_token(token, status, user_id),
+         updated_token <- create_updated_token(token, status, user_id),
          true <- :ets.insert(@table, {token_id, updated_token}) do
       {:ok, updated_token}
     else
@@ -361,7 +361,7 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
       token
       | status: status,
         current_user_id: user_id,
-        activated_at: if(status == :active, do: DateTime.utc_now(), else: nil)
+        activated_at: nil
     }
   end
 

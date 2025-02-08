@@ -200,6 +200,15 @@ defmodule TokenManager.Domain.Token.TokenService do
     TokenRepository.list_tokens()
   end
 
+  @doc """
+  Gets the usage history for a token.
+  Returns a list of token usages ordered by most recent first.
+  """
+  @spec get_token_history(binary()) :: [TokenUsage.t()]
+  def get_token_history(token_id) do
+    TokenRepository.get_token_history(token_id)
+  end
+
   defp unwrap_transaction_result({:ok, {:ok, result}}), do: {:ok, result}
 
   defp unwrap_transaction_result({:ok, {:error, %Ecto.Changeset{} = _changeset}}),

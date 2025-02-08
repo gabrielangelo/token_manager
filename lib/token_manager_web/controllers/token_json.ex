@@ -19,12 +19,9 @@ defmodule TokenManagerWeb.TokenJSON do
     %{data: data_with_active_usage(token)}
   end
 
-  def history(%{token: token}) do
+  def history(%{usages: usages}) do
     %{
-      data: %{
-        token_id: token.id,
-        usages: Enum.map(token.token_usages, &usage_data/1)
-      }
+      data: Enum.map(usages, &usage_data/1)
     }
   end
 

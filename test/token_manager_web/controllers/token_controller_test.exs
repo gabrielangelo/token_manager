@@ -182,19 +182,20 @@ defmodule TokenManagerWeb.TokenControllerTest do
         ended_at: DateTime.utc_now()
       )
 
-      insert(:token_usage_schema, token_id: token.id, user_id: user2_id)
+      insert(:token_usage_schema,
+        token_id: token.id,
+        user_id: user2_id
+      )
 
       conn = get(conn, ~p"/api/tokens/#{token.id}/history")
       response = json_response(conn, 200)
 
-      assert response["data"]["token_id"] == token.id
-      [last_token_usage, first_token_usage] = response["data"]["usages"]
+      [last_token_usage, first_token_usage] = response["data"]
 
       assert last_token_usage["user_id"] == user1_id
       assert not is_nil(last_token_usage["ended_at"])
 
       assert first_token_usage["user_id"] == user2_id
-
       assert is_nil(first_token_usage["ended_at"])
     end
 
@@ -203,7 +204,7 @@ defmodule TokenManagerWeb.TokenControllerTest do
 
       conn = get(conn, ~p"/api/tokens/#{token.id}/history")
 
-      assert %{"data" => %{"token_id" => _token_id, "usages" => []}} = json_response(conn, 200)
+      assert %{"data" => []} = json_response(conn, 200)
     end
   end
 

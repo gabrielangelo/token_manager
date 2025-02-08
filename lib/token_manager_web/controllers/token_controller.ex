@@ -57,20 +57,25 @@ defmodule TokenManagerWeb.TokenController do
         |> put_view(json: TokenManagerWeb.ErrorJSON)
         |> render(:error, status: 404, reason: ErrorMessages.error_message(reason))
     end
-
-    # Changed from "show.json"
   end
 
   @doc """
   Gets usage history for a specific token.
-
   Returns 200 with list of historical usages.
   Returns 404 if token not found.
   """
   def history(conn, %{"id" => token_id}) do
-    token = TokenService.get_token!(token_id)
-    # Changed from "history.json"
-    render(conn, :history, token: token)
+    case TokenService.get_token(token_id) do
+      {:ok, _token} ->
+        usages = TokenService.get_token_history(token_id)
+        render(conn, :history, usages: usages)
+
+      {:error, reason} ->
+        conn
+        |> put_status(:not_found)
+        |> put_view(json: TokenManagerWeb.ErrorJSON)
+        |> render(:error, status: 404, reason: ErrorMessages.error_message(reason))
+    end
   end
 
   @doc """
