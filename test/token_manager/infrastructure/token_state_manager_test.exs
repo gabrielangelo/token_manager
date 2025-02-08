@@ -17,11 +17,11 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManagerTest do
   describe "mark_token_active/2" do
     test "publishes token activation event" do
       user_id = Ecto.UUID.generate()
-      token = insert(:token_schema, status: :available)
+      token = build(:token_schema, status: :available)
       TokenStateManager.add_tokens([token])
 
       PubSub.subscribe(@pubsub, "token:#{token.id}")
-      TokenStateManager.mark_token_active(token.id, user_id)
+      TokenStateManager.mark_token_active(token, user_id)
       token_id = token.id
       assert_receive {:token_state_changed, ^token_id, :active, ^user_id}
     end
@@ -43,11 +43,11 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManagerTest do
   describe "subscribe_to_token/1" do
     test "receives events for specific token" do
       user_id = Ecto.UUID.generate()
-      token = insert(:token_schema, status: :available)
+      token = build(:token_schema, status: :available)
       TokenStateManager.add_tokens([token])
 
       TokenStateManager.subscribe_to_token(token.id)
-      TokenStateManager.mark_token_active(token.id, user_id)
+      TokenStateManager.mark_token_active(token, user_id)
       token_id = token.id
 
       assert_receive {:token_state_changed, ^token_id, :active, ^user_id}
@@ -55,12 +55,12 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManagerTest do
 
     test "doesn't receive events for other tokens" do
       user_id = Ecto.UUID.generate()
-      token = insert(:token_schema, status: :available)
+      token = build(:token_schema, status: :available)
       other_token = insert(:token_schema, status: :available)
       TokenStateManager.add_tokens([token, other_token])
 
       TokenStateManager.subscribe_to_token(token.id)
-      TokenStateManager.mark_token_active(other_token.id, user_id)
+      TokenStateManager.mark_token_active(other_token, user_id)
 
       refute_receive {:token_state_changed, _, _, _}
     end

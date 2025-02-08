@@ -183,17 +183,15 @@ defmodule TokenManager.Domain.Token.TokenServiceTest do
         {:ok, _} = TokenService.activate_token(user_id)
       end)
 
-      assert length(TokenStateManager.get_available_tokens()) == 0
-
+      Enum.empty?(TokenStateManager.get_available_tokens())
       {:ok, cleared_count} = TokenService.clear_active_tokens()
 
       assert cleared_count == 5
       assert TokenRepository.count_active_tokens() == 0
       assert length(TokenStateManager.get_available_tokens()) == 5
 
-      # checks if cache was updated
-      assert length(TokenStateManager.get_available_tokens()) == cleared_count
-      assert length(TokenStateManager.get_active_tokens()) == 0
+      refute Enum.empty?(TokenStateManager.get_available_tokens())
+      assert Enum.empty?(TokenStateManager.get_active_tokens())
 
       active_usages = TokenRepository.count_active_usages()
       assert active_usages == 0

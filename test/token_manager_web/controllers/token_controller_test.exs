@@ -154,7 +154,12 @@ defmodule TokenManagerWeb.TokenControllerTest do
                "data" => %{
                  "id" => _id,
                  "status" => "active",
-                 "current_user_id" => ^user_id
+                 "current_user_id" => ^user_id,
+                 "active_usage" => %{
+                   "ended_at" => nil,
+                   "started_at" => _,
+                   "user_id" => ^user_id
+                 }
                }
              } = json_response(conn, 200)
     end

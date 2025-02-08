@@ -16,12 +16,76 @@
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
 
+# Since we are building assets from assets/,
+# we ignore priv/static. You may want to comment
+# this depending on your deployment strategy.
+/priv/static/*
+
+# Directory for phoenix templates .css files
+!/priv/static/css
+
 # Also ignore archive artifacts (built via "mix archive.build").
 *.ez
 
-# Temporary files, for example, from tests.
-/tmp/
-
 # Ignore package tarball (built via "mix hex.build").
-token_manager-*.tar
+testtest-*.tar
 
+# If NPM/Yarn crashes, it generates a log, let's ignore it too.
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage directory
+/frontend/coverage/
+
+# The directory NPM downloads your dependencies sources to.
+/frontend/node_modules/
+
+# Frontend SAP builds
+/frontend/build/
+
+# The config/prod.secret.exs file by default contains sensitive
+# data and you should not commit it into version control.
+#
+# Alternatively, you may comment the line below and commit the
+# secrets file as long as you replace its contents by environment
+# variables.
+/config/prod.secret.exs
+
+# Dialyzer PLT files
+priv/plts/
+
+# Other stuff
+.elixir_ls/
+.lexical
+.arvore_docker_cache/
+tmp/
+.DS_Store
+.iex.exs
+/testek8s
+/db
+
+# IDEs
+*.iml
+.idea*
+.editorconfig
+.vscode
+tags
+.zed
+
+# Local configs
+.envrc.*
+!.envrc.custom.example
+
+node_modules/
+
+mysql-data/
+
+postgres-data/
+
+.k8s/generated/
+
+# repo database dumps
+/priv/repo/*.sql
+
+*.coverdata

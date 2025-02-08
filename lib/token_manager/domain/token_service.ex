@@ -117,7 +117,7 @@ defmodule TokenManager.Domain.Token.TokenService do
     with {:ok, activated_token} <- do_activate_token(token, user_id),
          {:ok, token_usage} <- create_token_usage(activated_token, user_id),
          {:ok, _job} <- schedule_cleanup(activated_token.id) do
-      TokenStateManager.mark_token_active(token.id, user_id)
+      TokenStateManager.mark_token_active(activated_token, user_id)
       {:ok, %{token: activated_token, token_usage: token_usage}}
     else
       {:error, _error} = error -> error

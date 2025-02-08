@@ -64,10 +64,6 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   @table :token_states
   @refresh_interval :timer.minutes(5)
 
-  #
-  # Client API
-  #
-
   @doc """
   Starts the TokenStateManager process with the given options.
 
@@ -135,9 +131,9 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   Marks a token as active and assigns it to a user.
   Broadcasts the state change to all nodes.
   """
-  @spec mark_token_active(binary(), binary()) :: update_result()
-  def mark_token_active(token_id, user_id) when is_binary(token_id) and is_binary(user_id) do
-    GenServer.call(__MODULE__, {:mark_active, token_id, user_id})
+  @spec mark_token_active(Token.t(), binary()) :: update_result()
+  def mark_token_active(token, user_id) do
+    GenServer.call(__MODULE__, {:mark_active, token, user_id})
   end
 
   @doc """
@@ -196,10 +192,6 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
     PubSub.subscribe(@pubsub, @topic)
   end
 
-  #
-  # Server Callbacks
-  #
-
   @impl true
   def init(_) do
     table = initialize_table()
@@ -221,9 +213,9 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   end
 
   @impl true
-  def handle_call({:mark_active, token_id, user_id}, _from, state) do
-    result = update_token_state(token_id, :active, user_id)
-    if match?({:ok, _}, result), do: broadcast_state_change({:token_activated, token_id, user_id})
+  def handle_call({:mark_active, token, user_id}, _from, state) do
+    result = update_token_state_with_usage(token, user_id)
+    if match?({:ok, _}, result), do: broadcast_state_change({:token_activated, token.id, user_id})
     {:reply, result, state}
   end
 
@@ -260,10 +252,6 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
     schedule_state_refresh()
     {:noreply, state}
   end
-
-  #
-  # Private Functions
-  #
 
   defp initialize_table do
     case :ets.info(@table) do
@@ -336,6 +324,31 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
 
       error ->
         Logger.error("Failed to update token state: #{inspect(error)}")
+        {:error, :update_failed}
+    end
+  end
+
+  defp update_token_state_with_usage(token, user_id) do
+    try do
+      case :ets.lookup(@table, token.id) do
+        [{token_id, existing_token}] ->
+          updated_token = %{
+            existing_token
+            | status: :active,
+              activated_at: DateTime.utc_now(),
+              current_user_id: user_id,
+              token_usages: token.token_usages
+          }
+
+          :ets.insert(@table, {token_id, updated_token})
+          {:ok, updated_token}
+
+        [] ->
+          {:error, :not_found}
+      end
+    catch
+      error ->
+        Logger.error("Failed to update token state with usage: #{inspect(error)}")
         {:error, :update_failed}
     end
   end
