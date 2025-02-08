@@ -35,8 +35,8 @@ For database operations, SELECT FOR UPDATE SKIP LOCKED ensures reliable token al
 The ETS layer uses specific configuration settings (:set, :protected, read_concurrency: true) to optimize token status checks when many users need access simultaneously.
 
 ### Database Design
-
-The PostgreSQL database emphasizes organization and efficient retrieval. It uses UUID identifiers for tokens and usage records, allowing for independent record creation across multiple servers. The database includes rules to maintain proper connections between related data.
+It uses UUID identifiers for tokens and usage records, allowing for independent record creation across multiple servers. The database includes rules to maintain proper connections between related data like token and token_usage. These 
+tables is the base for the token manager data.
 
 The system deliberately omits a dedicated user management system to maintain focus on the token state machine implementation. Instead, it uses UUID strings to simulate user identifiers, which adequately serves the core token management functionality without introducing the complexity of user authentication and management.
 
@@ -144,13 +144,15 @@ mix test --cover
 mix test.watch
 ```
 
-## API Usage
+# API Usage
 
-The system provides straightforward token management through its REST API. Here are the key operations:
+The Token Manager provides a REST API for token operations. All endpoints handle JSON data and return consistent response formats. Here's how to use each endpoint:
 
-### Token Activation
+## Endpoints Overview
 
-Request a token:
+### Activate a Token
+
+Request a new token for a user:
 
 ```bash
 curl -X POST http://localhost:4000/api/tokens/activate \
@@ -158,8 +160,7 @@ curl -X POST http://localhost:4000/api/tokens/activate \
   -d '{"user_id": "123e4567-e89b-12d3-a456-426614174000"}'
 ```
 
-Successful response:
-
+Success response (200 OK):
 ```json
 {
   "data": {
@@ -170,7 +171,157 @@ Successful response:
 }
 ```
 
-[Additional API endpoints and examples follow...]
+Error response (422 Unprocessable Entity):
+```json
+{
+  "errors": {
+    "user_id": ["already has an active token"]
+  }
+}
+```
+
+### List All Tokens
+
+Get the status of all tokens in the system:
+
+```bash
+curl http://localhost:4000/api/tokens
+```
+
+Response (200 OK):
+```json
+{
+  "data": [
+    {
+      "id": "123e4567-e89b-12d3-a456-426614174000",
+      "status": "active",
+      "current_user_id": "789e4567-e89b-12d3-a456-426614174000",
+      "activated_at": "2025-02-07T14:30:00Z"
+    },
+    {
+      "id": "456e4567-e89b-12d3-a456-426614174000",
+      "status": "available",
+      "current_user_id": null,
+      "activated_at": null
+    }
+  ],
+  "meta": {
+    "total_count": 100,
+    "active_count": 1,
+    "available_count": 99
+  }
+}
+```
+
+### Get Token Details
+
+Retrieve information about a specific token:
+
+```bash
+curl http://localhost:4000/api/tokens/123e4567-e89b-12d3-a456-426614174000
+```
+
+Success response (200 OK):
+```json
+{
+  "data": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "status": "active",
+    "current_user_id": "789e4567-e89b-12d3-a456-426614174000",
+    "active_usage": {
+      "user_id": "789e4567-e89b-12d3-a456-426614174000",
+      "started_at": "2025-02-07T14:30:00Z",
+      "expires_at": "2025-02-07T14:32:00Z"
+    }
+  }
+}
+```
+
+Error response (404 Not Found):
+```json
+{
+  "errors": {
+    "token": ["not found"]
+  }
+}
+```
+
+### View Token History
+
+Get the usage history of a specific token:
+
+```bash
+curl http://localhost:4000/api/tokens/123e4567-e89b-12d3-a456-426614174000/history
+```
+
+Response (200 OK):
+```json
+{
+  "data": {
+    "token_id": "123e4567-e89b-12d3-a456-426614174000",
+    "usages": [
+      {
+        "user_id": "789e4567-e89b-12d3-a456-426614174000",
+        "started_at": "2025-02-07T14:30:00Z",
+        "ended_at": "2025-02-07T14:32:00Z"
+      },
+      {
+        "user_id": "456e4567-e89b-12d3-a456-426614174000",
+        "started_at": "2025-02-07T14:25:00Z",
+        "ended_at": "2025-02-07T14:27:00Z"
+      }
+    ],
+    "meta": {
+      "total_usages": 2
+    }
+  }
+}
+```
+
+### Clear Active Tokens
+
+Release all currently active tokens:
+
+```bash
+curl -X POST http://localhost:4000/api/tokens/clear
+```
+
+Response (200 OK):
+```json
+{
+  "data": {
+    "cleared_tokens": 3,
+    "message": "Successfully cleared all active tokens"
+  }
+}
+```
+
+## Response Codes
+
+The API uses standard HTTP status codes:
+
+- 200: Successful operation
+- 400: Bad request (invalid input)
+- 404: Resource not found
+- 422: Validation error
+- 500: Server error
+
+## Request Rate Limits
+
+- Maximum 100 requests per minute per IP address
+- Burst allowance of 20 requests
+- Rate limit headers included in responses:
+  - X-RateLimit-Limit
+  - X-RateLimit-Remaining
+  - X-RateLimit-Reset
+
+## Notes
+
+- All timestamps are in UTC and follow ISO 8601 format
+- Token IDs and user IDs must be valid UUIDs
+- Active tokens automatically expire after 2 minutes
+- A user can only have one active token at a time
+- The system maintains exactly 100 tokens total
 
 ## Dependencies
 
