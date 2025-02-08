@@ -1,7 +1,9 @@
 defmodule TokenManager.Infrastructure.StateManager.TokenStateManagerTest do
   use TokenManager.DataCase
+  alias TokenManager.Domain.Token.TokenService
 
   alias TokenManager.Infrastructure.StateManager.TokenStateManager
+
   alias Phoenix.PubSub
 
   @pubsub TokenManager.PubSub
@@ -80,7 +82,7 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManagerTest do
       TokenStateManager.subscribe_to_all_tokens()
       TokenStateManager.add_tokens(created_tokens)
 
-      TokenManager.Domain.Token.TokenService.activate_token(user_id)
+      TokenService.activate_token(user_id)
       token_id = token.id
       assert_receive {:token_state_change, {:token_activated, ^token_id, _, ^user_id}}
     end

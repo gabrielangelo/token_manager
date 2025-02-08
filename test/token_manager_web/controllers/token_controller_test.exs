@@ -3,8 +3,8 @@ defmodule TokenManagerWeb.TokenControllerTest do
 
   import TokenManager.Factory
 
-  alias TokenManager.Infrastructure.StateManager.TokenStateManager
   alias TokenManager.Infrastructure.Repositories.TokenRepository
+  alias TokenManager.Infrastructure.StateManager.TokenStateManager
 
   setup do
     {:ok, _token_manager} =
