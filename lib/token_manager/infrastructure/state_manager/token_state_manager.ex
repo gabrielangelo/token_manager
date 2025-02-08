@@ -313,25 +313,24 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   end
 
   defp clear_all_active_tokens do
-    try do
-      match_spec = [
-        {{:"$1", :"$2"}, [{:==, {:map_get, :status, :"$2"}, :active}], [{{:"$1", :"$2"}}]}
-      ]
+    match_spec = [
+      {{:"$1", :"$2"}, [{:==, {:map_get, :status, :"$2"}, :active}], [{{:"$1", :"$2"}}]}
+    ]
 
-      active_tokens = :ets.select(@table, match_spec)
+    active_tokens = :ets.select(@table, match_spec)
 
-      Enum.each(active_tokens, fn {token_id, token} ->
-        updated_token = %{token | status: :available, current_user_id: nil, activated_at: nil}
-        :ets.update_element(@table, token_id, [{2, updated_token}])
-        broadcast_state_change({:token_released, token_id, nil})
-      end)
+    active_tokens
+    |> Enum.each(fn {token_id, token} ->
+      updated_token = %{token | status: :available, current_user_id: nil, activated_at: nil}
+      :ets.update_element(@table, token_id, [{2, updated_token}])
+      broadcast_state_change({:token_released, token_id, nil})
+    end)
 
-      {:ok, length(active_tokens)}
-    catch
-      error ->
-        Logger.error("Failed to clear active tokens: #{inspect(error)}")
-        {:error, :clear_failed}
-    end
+    {:ok, length(active_tokens)}
+  rescue
+    error ->
+      Logger.error("Failed to clear active tokens: #{inspect(error)}")
+      {:error, :clear_failed}
   end
 
   defp update_token_state(token_id, status, user_id) do
@@ -350,28 +349,25 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
   end
 
   defp update_token_state_with_usage(token, user_id) do
-    try do
-      case :ets.lookup(@table, token.id) do
-        [{token_id, existing_token}] ->
-          updated_token = %{
-            existing_token
-            | status: :active,
-              activated_at: DateTime.utc_now(),
-              current_user_id: user_id,
-              token_usages: token.token_usages
-          }
+    [{token_id, existing_token}] = :ets.lookup(@table, token.id)
 
-          :ets.insert(@table, {token_id, updated_token})
-          {:ok, updated_token}
+    updated_token = %{
+      existing_token
+      | status: :active,
+        activated_at: DateTime.utc_now(),
+        current_user_id: user_id,
+        token_usages: token.token_usages
+    }
 
-        [] ->
-          {:error, :not_found}
-      end
-    catch
-      error ->
-        Logger.error("Failed to update token state with usage: #{inspect(error)}")
-        {:error, :update_failed}
-    end
+    :ets.insert(@table, {token_id, updated_token})
+    {:ok, updated_token}
+  rescue
+    MatchError ->
+      {:error, :not_found}
+
+    error ->
+      Logger.error("Failed to update token state with usage: #{inspect(error)}")
+      {:error, :update_failed}
   end
 
   defp create_updated_token(%{token_usages: nil} = token, status, user_id) do
