@@ -1,4 +1,6 @@
 defmodule TokenManager.Infrastructure.StateManager.TokenStateManagerTest do
+  @moduledoc false
+
   use TokenManager.DataCase
   alias TokenManager.Domain.Token.TokenService
 

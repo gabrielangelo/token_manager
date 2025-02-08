@@ -1,4 +1,5 @@
 defmodule TokenManagerWeb.TokenControllerTest do
+  @moduledoc false
   use TokenManagerWeb.ConnCase, async: false
 
   import TokenManager.Factory
