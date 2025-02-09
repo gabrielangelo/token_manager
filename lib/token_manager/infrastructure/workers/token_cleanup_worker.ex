@@ -3,11 +3,7 @@ defmodule TokenManager.Infrastructure.Workers.TokenCleanupWorker do
   An Oban worker that handles the periodic cleanup of expired tokens
   from the token store. Using Oban's scheduling capabilities, it runs
   at configurable intervals to maintain system health by removing tokens
-  that are no longer valid. The worker processes tokens in batches for
-  efficiency and uses the PubSub system to notify other parts of the application about cleanup operations.
-  It also exposes metrics for monitoring cleanup performance and effectiveness.
-  The worker requires proper Oban queue configuration in the application config
-  and integrates with the token store and PubSub systems.
+  that are no longer valid.
   """
   use Oban.Worker,
     queue: :token_cleanup_queue,

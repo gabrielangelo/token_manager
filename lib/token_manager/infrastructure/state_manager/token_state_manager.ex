@@ -99,7 +99,6 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
 
   @doc """
   Retrieves the current state of a specific token.
-  Returns {:ok, token} if found, {:error, reason} otherwise.
   """
   @spec get_token_state(binary()) :: lookup_result()
   def get_token_state(token_id) when is_binary(token_id) do
@@ -111,7 +110,6 @@ defmodule TokenManager.Infrastructure.StateManager.TokenStateManager do
 
   @doc """
   Retrieves the token usage history for a specific token.
-  Returns a list of token usage entries sorted by timestamp in descending order.
   """
   @spec get_token_history(binary()) :: {:ok, [Token.t()]} | {:error, :not_found}
   def get_token_history(token_id) when is_binary(token_id) do
