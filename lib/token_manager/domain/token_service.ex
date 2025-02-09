@@ -73,9 +73,6 @@ defmodule TokenManager.Domain.Token.TokenService do
   Activates a token for a user.
 
   If no tokens are available, releases and reactivates the oldest active token.
-
-  Returns `{:ok, %{token: token, token_usage: usage}}` on success,
-  or `{:error, reason}` on failure.
   """
   def activate_token(user_id) do
     TokenRepository.transaction(fn ->
@@ -128,8 +125,6 @@ defmodule TokenManager.Domain.Token.TokenService do
   Releases a token, making it available for other users.
 
   Closes the active usage record and schedules cleanup.
-
-  Returns `{:ok, token}` on success, or `{:error, reason}` on failure.
   """
   def release_token(token) do
     TokenRepository.transaction(fn ->
@@ -178,10 +173,7 @@ defmodule TokenManager.Domain.Token.TokenService do
   end
 
   @doc """
-  Releases all active tokens and closes their usage records.
-
-  Returns `{:ok, count}` where count is the number of tokens released,
-  or `{:error, reason}` on failure.
+  Releases all active tokens and closes their usage records.l
   """
   @spec clear_active_tokens() :: {:ok, non_neg_integer()} | {:error, error_reason()}
   def clear_active_tokens do
@@ -202,7 +194,6 @@ defmodule TokenManager.Domain.Token.TokenService do
 
   @doc """
   Gets the usage history for a token.
-  Returns a list of token usages ordered by most recent first.
   """
   @spec get_token_history(binary()) :: [TokenUsage.t()]
   def get_token_history(token_id) do
