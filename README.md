@@ -342,7 +342,8 @@ Planned improvements include:
 2. Request rate control using token bucket algorithm
 3. Visual interface for token usage data
 4. Enhanced error handling and logging
-5. OpenAPI/Swagger documentation
+5. Replace Ets by Mnesia for distributed replica nodes with cached tokens 
+6. OpenAPI/Swagger documentation
 
 ## Conclusion
 
